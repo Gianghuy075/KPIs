@@ -234,6 +234,7 @@ const Dashboard = () => {
         onSubmit={handleSubmit}
         editingKPI={editingKPI}
         loading={loading}
+        allKPIs={kpis}
       />
     </div>
   );

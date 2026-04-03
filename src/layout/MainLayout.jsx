@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Layout, Menu, Avatar, Dropdown, Typography, Breadcrumb, Space } from 'antd';
 import {
   DashboardOutlined,
@@ -9,58 +9,156 @@ import {
   TrophyOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  TeamOutlined,
+  FileTextOutlined,
+  CalendarOutlined,
+  CheckOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Title } = Typography;
 
-const menuItems = [
-  {
-    key: '/dashboard',
-    icon: <DashboardOutlined />,
-    label: 'Dashboard KPI',
-  },
-  {
-    key: '/reports',
-    icon: <BarChartOutlined />,
-    label: 'Báo cáo',
-    disabled: true,
-  },
-  {
-    key: '/settings',
-    icon: <SettingOutlined />,
-    label: 'Cài đặt',
-    disabled: true,
-  },
-];
-
-const userMenuItems = [
-  {
-    key: 'profile',
-    icon: <UserOutlined />,
-    label: 'Hồ sơ cá nhân',
-  },
-  {
-    key: 'logout',
-    icon: <LogoutOutlined />,
-    label: 'Đăng xuất',
-    danger: true,
-  },
-];
-
 const breadcrumbMap = {
   '/dashboard': 'Dashboard KPI',
-  '/reports': 'Báo cáo',
-  '/settings': 'Cài đặt',
+  '/admin/users': 'Quản lý Người dùng',
+  '/admin/departments': 'Quản lý Phòng ban',
+  '/admin/monthly-work': 'Quản lý Công việc Hàng tháng',
+  '/admin/quarterly-work': 'Quản lý Công việc Hàng quý',
+  '/admin/yearly-work': 'Quản lý Công việc Hàng năm',
+  '/admin/weights': 'Quản lý Trọng số Đánh giá',
+  '/admin/daily-work': 'Quản lý Công việc Hàng ngày',
+  '/admin/daily-evaluation': 'Quản lý Đánh giá Hàng ngày',
+  '/admin/monthly-evaluation': 'Quản lý Đánh giá Hàng tháng',
+  '/admin/yearly-evaluation': 'Quản lý Đánh giá Hàng năm',
 };
 
 const MainLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
+  // Tạo menu items dynamically dựa trên user role
+  const getMenuItems = () => {
+    const baseItems = [
+      {
+        key: '/dashboard',
+        icon: <DashboardOutlined />,
+        label: 'Dashboard KPI',
+      },
+    ];
+
+    // Thêm menu items cho Executive
+    if (user?.role === 'executive') {
+      baseItems.push(
+        {
+          key: 'management',
+          icon: <SettingOutlined />,
+          label: 'Quản lý Hệ thống',
+          children: [
+            {
+              key: '/admin/users',
+              icon: <TeamOutlined />,
+              label: 'Quản lý Người dùng',
+            },
+            {
+              key: '/admin/departments',
+              icon: <TeamOutlined />,
+              label: 'Quản lý Phòng ban',
+            },
+            {
+              key: '/admin/monthly-work',
+              icon: <CalendarOutlined />,
+              label: 'Công việc Hàng tháng',
+            },
+            {
+              key: '/admin/quarterly-work',
+              icon: <FileTextOutlined />,
+              label: 'Công việc Hàng quý',
+            },
+            {
+              key: '/admin/yearly-work',
+              icon: <FileTextOutlined />,
+              label: 'Công việc Hàng năm',
+            },
+          ],
+        },
+        {
+          key: 'evaluation',
+          icon: <CheckOutlined />,
+          label: 'Quản lý Đánh giá',
+          children: [
+            {
+              key: '/admin/weights',
+              icon: <FileTextOutlined />,
+              label: 'Trọng số Đánh giá',
+            },
+            {
+              key: '/admin/daily-work',
+              icon: <CalendarOutlined />,
+              label: 'Công việc Hàng ngày',
+            },
+            {
+              key: '/admin/daily-evaluation',
+              icon: <CheckOutlined />,
+              label: 'Đánh giá Hàng ngày',
+            },
+            {
+              key: '/admin/monthly-evaluation',
+              icon: <CheckOutlined />,
+              label: 'Đánh giá Hàng tháng',
+            },
+            {
+              key: '/admin/yearly-evaluation',
+              icon: <CheckOutlined />,
+              label: 'Đánh giá Hàng năm',
+            },
+          ],
+        }
+      );
+    }
+
+    // Thêm các menu items chung khác
+    baseItems.push(
+      {
+        key: '/reports',
+        icon: <BarChartOutlined />,
+        label: 'Báo cáo',
+        disabled: true,
+      },
+    );
+
+    return baseItems;
+  };
+
+  // Gọi useMemo TRƯỚC khi có điều kiện early return
+  const menuItems = useMemo(() => getMenuItems(), [user?.role]);
   const currentBreadcrumb = breadcrumbMap[location.pathname] || 'Dashboard KPI';
+
+  // Nếu ở trang login, chỉ hiển thị children
+  if (location.pathname === '/login' || !user) {
+    return <>{children}</>;
+  }
+
+  const userMenuItems = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: 'Hồ sơ cá nhân',
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Đăng xuất',
+      danger: true,
+      onClick: () => {
+        logout();
+        navigate('/login');
+      },
+    },
+  ];
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -97,7 +195,12 @@ const MainLayout = ({ children }) => {
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={({ key }) => {
+            // Chỉ navigate nếu key là một route hợp lệ (bắt đầu bằng /)
+            if (key.startsWith('/')) {
+              navigate(key);
+            }
+          }}
           style={{ borderRight: 0 }}
         />
       </Sider>
@@ -132,7 +235,7 @@ const MainLayout = ({ children }) => {
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
             <Space style={{ cursor: 'pointer' }}>
               <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }} />
-              <span style={{ fontWeight: 500 }}>Quản trị viên</span>
+              <span style={{ fontWeight: 500 }}>{user?.name || 'Người dùng'}</span>
             </Space>
           </Dropdown>
         </Header>

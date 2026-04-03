@@ -127,6 +127,28 @@ let kpiData = INITIAL_KPI_DATA.map((kpi) => {
 
 let nextId = kpiData.length + 1;
 
+// Helper function to calculate total weight
+export const calculateTotalWeight = (kpis) => {
+  return kpis.reduce((sum, k) => sum + (k.weight || 0), 0);
+};
+
+// Validator function to check if total weight equals 100
+export const validateTotalWeight = (kpis) => {
+  const totalWeight = calculateTotalWeight(kpis);
+  if (Math.abs(totalWeight - 100) > 0.01) { // Allow small floating point error
+    return {
+      isValid: false,
+      totalWeight: parseFloat(totalWeight.toFixed(1)),
+      message: `Tổng trọng số phải bằng 100%. Hiện tại: ${totalWeight.toFixed(1)}%`,
+    };
+  }
+  return {
+    isValid: true,
+    totalWeight: 100,
+    message: 'Tổng trọng số hợp lệ',
+  };
+};
+
 export const kpiService = {
   getAll: () => Promise.resolve([...kpiData]),
 

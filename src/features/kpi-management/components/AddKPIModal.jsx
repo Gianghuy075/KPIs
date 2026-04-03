@@ -1,11 +1,13 @@
-import React, { useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Switch, Row, Col } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Modal, Form, Input, InputNumber, Select, Switch, Row, Col, Alert, Space } from 'antd';
 import { PERSPECTIVES } from '../../../utils/kpiUtils';
+import { calculateTotalWeight, validateTotalWeight } from '../services/kpiService';
 
 const { Option } = Select;
 
-const AddKPIModal = ({ open, onClose, onSubmit, editingKPI, loading }) => {
+const AddKPIModal = ({ open, onClose, onSubmit, editingKPI, loading, allKPIs = [] }) => {
   const [form] = Form.useForm();
+  const [weightValidation, setWeightValidation] = useState(null);
 
   useEffect(() => {
     if (open) {
@@ -14,12 +16,58 @@ const AddKPIModal = ({ open, onClose, onSubmit, editingKPI, loading }) => {
       } else {
         form.resetFields();
       }
+      updateWeightValidation();
     }
-  }, [open, editingKPI, form]);
+  }, [open, editingKPI, form, allKPIs]);
+
+  const updateWeightValidation = () => {
+    // Calculate total weight excluding the KPI being edited
+    const kpisForValidation = editingKPI 
+      ? allKPIs.filter(k => k.id !== editingKPI.id)
+      : allKPIs;
+    
+    const currentWeight = form.getFieldValue('weight') || 0;
+    const totalWeight = calculateTotalWeight(kpisForValidation) + currentWeight;
+    
+    const validation = validateTotalWeight([
+      ...kpisForValidation,
+      { weight: currentWeight }
+    ]);
+    
+    setWeightValidation({
+      ...validation,
+      totalWeight: parseFloat(totalWeight.toFixed(1)),
+    });
+  };
+
+  const handleWeightChange = () => {
+    updateWeightValidation();
+  };
 
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
+      
+      // Calculate weights for validation
+      const kpisForValidation = editingKPI 
+        ? allKPIs.filter(k => k.id !== editingKPI.id)
+        : allKPIs;
+      
+      const kpisToValidate = [
+        ...kpisForValidation,
+        { weight: values.weight }
+      ];
+      
+      const validation = validateTotalWeight(kpisToValidate);
+      
+      if (!validation.isValid) {
+        Modal.error({
+          title: 'Lỗi Trọng số',
+          content: validation.message,
+        });
+        return;
+      }
+      
       await onSubmit(values);
       form.resetFields();
     } catch {
@@ -45,6 +93,28 @@ const AddKPIModal = ({ open, onClose, onSubmit, editingKPI, loading }) => {
       destroyOnClose
     >
       <Form form={form} layout="vertical" requiredMark="optional">
+        {weightValidation && (
+          <Alert
+            message={editingKPI ? 'Cập nhật Trọng số' : 'Kiểm tra Trọng số'}
+            description={
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div>Tổng trọng số hiện tại: <strong>{weightValidation.totalWeight}%</strong></div>
+                {!weightValidation.isValid && (
+                  <div style={{ color: '#ff4d4f' }}>
+                    ⚠️ {weightValidation.message}
+                  </div>
+                )}
+                {weightValidation.isValid && (
+                  <div style={{ color: '#52c41a' }}>
+                    ✓ Tổng trọng số hợp lệ (100%)
+                  </div>
+                )}
+              </Space>
+            }
+            type={weightValidation.isValid ? 'success' : 'warning'}
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Row gutter={16}>
           <Col span={24}>
             <Form.Item
@@ -87,6 +157,7 @@ const AddKPIModal = ({ open, onClose, onSubmit, editingKPI, loading }) => {
                 max={100}
                 precision={1}
                 addonAfter="%"
+                onChange={handleWeightChange}
               />
             </Form.Item>
           </Col>
