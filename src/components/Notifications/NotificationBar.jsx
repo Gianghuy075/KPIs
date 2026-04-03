@@ -10,8 +10,8 @@ import { useNotification } from '../../contexts/NotificationContext';
 const NotificationBar = () => {
   const { notifications, hideNotification, markAsRead } = useNotification();
 
-  // Lấy thông báo chưa đọc
-  const unreadNotifications = notifications.filter(n => n.status !== 'read');
+  // Lấy thông báo chưa đọc và chưa ẩn
+  const unreadNotifications = notifications.filter(n => n.status !== 'read' && n.status !== 'hidden');
 
   if (unreadNotifications.length === 0) {
     return null;

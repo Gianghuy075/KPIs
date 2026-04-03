@@ -9,6 +9,11 @@ const NotificationManager = () => {
   const [dialogVisible, setDialogVisible] = useState(false);
   const [hasShown, setHasShown] = useState(false);
 
+  // Chỉ hiển thị khi user đã đăng nhập
+  if (!user) {
+    return null;
+  }
+
   // Hiển thị dialog khi người dùng đăng nhập và có thông báo mới
   useEffect(() => {
     if (user && dialogNotifications.length > 0 && !hasShown) {

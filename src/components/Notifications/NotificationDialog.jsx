@@ -7,7 +7,7 @@ import {
 import { useNotification } from '../../contexts/NotificationContext';
 
 const NotificationDialog = ({ visible, onClose }) => {
-  const { dialogNotifications, markAsRead, hideNotification } = useNotification();
+  const { dialogNotifications, markAsRead, hideDialogNotification } = useNotification();
 
   const getRecipientLabel = (recipients) => {
     if (recipients.includes('manager') && recipients.includes('employee')) {
@@ -34,7 +34,7 @@ const NotificationDialog = ({ visible, onClose }) => {
   };
 
   const handleClose = (notificationId) => {
-    hideNotification(notificationId);
+    hideDialogNotification(notificationId);
   };
 
   return (

@@ -285,6 +285,7 @@ const MainLayout = ({ children }) => {
           KPI Management System ©2024 | Balanced Scorecard
         </Footer>
       </Layout>
+      </Layout>
     </>
   );
 };

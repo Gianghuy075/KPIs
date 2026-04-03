@@ -46,9 +46,16 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Ẩn thông báo (thu gọn)
-  const hideNotification = async (notificationId) => {
+  // Ẩn thông báo khỏi dialog
+  const hideDialogNotification = (notificationId) => {
     setDialogNotifications(dialogNotifications.filter(n => n.id !== notificationId));
+  };
+
+  // Ẩn thông báo (thu gọn)
+  const hideNotification = (notificationId) => {
+    setNotifications(notifications.map(n => 
+      n.id === notificationId ? { ...n, status: 'hidden' } : n
+    ));
   };
 
   // Tạo thông báo mới (cho executive)
@@ -84,6 +91,7 @@ export const NotificationProvider = ({ children }) => {
         loadNotifications,
         markAsRead,
         hideNotification,
+        hideDialogNotification,
         createNotification,
         deleteNotification,
       }}
