@@ -15,6 +15,7 @@ import KPITable from '../features/kpi-management/components/KPITable';
 import AddKPIModal from '../features/kpi-management/components/AddKPIModal';
 import StatisticsCard from '../components/StatisticsCard';
 import PerspectivePieChart from '../components/Charts/PerspectivePieChart';
+import NotificationBar from '../components/Notifications/NotificationBar';
 import { getStatusColor, getStatusLabel } from '../utils/kpiUtils';
 
 const { Title, Text } = Typography;
@@ -79,6 +80,8 @@ const Dashboard = () => {
 
   return (
     <div>
+      <NotificationBar />
+
       {error && (
         <Alert
           message="Lỗi tải dữ liệu"

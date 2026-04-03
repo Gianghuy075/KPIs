@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider, App as AntApp } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import MainLayout from './layout/MainLayout';
 import AppRouter from './routes/AppRouter';
 import ErrorBoundary from './components/Feedback/ErrorBoundary';
@@ -21,9 +22,11 @@ const App = () => (
       <BrowserRouter>
         <ErrorBoundary>
           <AuthProvider>
-            <MainLayout>
-              <AppRouter />
-            </MainLayout>
+            <NotificationProvider>
+              <MainLayout>
+                <AppRouter />
+              </MainLayout>
+            </NotificationProvider>
           </AuthProvider>
         </ErrorBoundary>
       </BrowserRouter>

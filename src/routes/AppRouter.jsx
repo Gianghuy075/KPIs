@@ -5,10 +5,15 @@ import Dashboard from '../pages/Dashboard';
 import Login from '../pages/Login';
 import UserManagement from '../pages/admin/UserManagement';
 import DepartmentManagement from '../pages/admin/DepartmentManagement';
+import KPIManagement from '../pages/admin/KPIManagement';
+import KPIDashboards from '../pages/admin/KPIDashboards';
+import DepartmentKPIDashboard from '../pages/admin/DepartmentKPIDashboard';
+import NotificationManagement from '../pages/admin/NotificationManagement';
 import MonthlyWorkManagement from '../pages/admin/MonthlyWorkManagement';
 import QuarterlyWorkManagement from '../pages/admin/QuarterlyWorkManagement';
 import YearlyWorkManagement from '../pages/admin/YearlyWorkManagement';
-import WeightManagement from '../pages/admin/WeightManagement';
+import KPIPenaltyRules from '../pages/admin/KPIPenaltyRules';
+import PenaltyRulesByBSC from '../pages/admin/PenaltyRulesByBSC';
 import DailyWorkManagement from '../pages/admin/DailyWorkManagement';
 import DailyEvaluation from '../pages/admin/DailyEvaluation';
 import MonthlyEvaluation from '../pages/admin/MonthlyEvaluation';
@@ -35,11 +40,16 @@ const AppRouter = () => {
             <>
               <Route path="/admin/users" element={<UserManagement />} />
               <Route path="/admin/departments" element={<DepartmentManagement />} />
+              <Route path="/admin/notifications" element={<NotificationManagement />} />
+              <Route path="/admin/kpi-management" element={<KPIManagement />} />
+              <Route path="/admin/kpi-dashboards" element={<KPIDashboards />} />
+              <Route path="/admin/kpi-dashboards/:departmentId" element={<DepartmentKPIDashboard />} />
               <Route path="/admin/monthly-work" element={<MonthlyWorkManagement />} />
               <Route path="/admin/quarterly-work" element={<QuarterlyWorkManagement />} />
               <Route path="/admin/yearly-work" element={<YearlyWorkManagement />} />
               
-              <Route path="/admin/weights" element={<WeightManagement />} />
+              <Route path="/admin/penalty-rules" element={<KPIPenaltyRules />} />
+              <Route path="/admin/penalty-rules-bsc" element={<PenaltyRulesByBSC />} />
               <Route path="/admin/daily-work" element={<DailyWorkManagement />} />
               <Route path="/admin/daily-evaluation" element={<DailyEvaluation />} />
               <Route path="/admin/monthly-evaluation" element={<MonthlyEvaluation />} />

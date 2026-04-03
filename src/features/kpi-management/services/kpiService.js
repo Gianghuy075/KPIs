@@ -127,6 +127,16 @@ let kpiData = INITIAL_KPI_DATA.map((kpi) => {
 
 let nextId = kpiData.length + 1;
 
+// Store for department-specific KPIs
+let departmentKPIs = {
+  1: [], // Ban Lãnh đạo
+  2: [], // Kinh doanh
+  3: [], // Kỹ thuật
+  4: [], // Nhân sự
+};
+
+let nextDeptKPIId = 1000;
+
 // Helper function to calculate total weight
 export const calculateTotalWeight = (kpis) => {
   return kpis.reduce((sum, k) => sum + (k.weight || 0), 0);
@@ -147,6 +157,114 @@ export const validateTotalWeight = (kpis) => {
     totalWeight: 100,
     message: 'Tổng trọng số hợp lệ',
   };
+};
+
+// Department KPI Management Services
+export const kpiService = {
+  // Company-level KPIs
+  getAll: async () => {
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(kpiData), 100);
+    });
+  },
+
+  create: async (kpiData) => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const newKPI = {
+          ...kpiData,
+          id: nextId++,
+        };
+        kpiData.push(newKPI);
+        resolve(newKPI);
+      }, 100);
+    });
+  },
+
+  update: async (id, updates) => {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        const index = kpiData.findIndex(k => k.id === id);
+        if (index !== -1) {
+          kpiData[index] = { ...kpiData[index], ...updates };
+          resolve(kpiData[index]);
+        } else {
+          reject(new Error('KPI not found'));
+        }
+      }, 100);
+    });
+  },
+
+  delete: async (id) => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        kpiData = kpiData.filter(k => k.id !== id);
+        resolve();
+      }, 100);
+    });
+  },
+
+  // Department-level KPIs
+  getDepartmentKPIs: async (departmentId) => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(departmentKPIs[departmentId] || []);
+      }, 100);
+    });
+  },
+
+  addDepartmentKPI: async (departmentId, kpiData) => {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (!departmentKPIs[departmentId]) {
+          departmentKPIs[departmentId] = [];
+        }
+        
+        const newKPI = {
+          ...kpiData,
+          id: nextDeptKPIId++,
+          departmentId,
+          createdAt: new Date().toISOString(),
+        };
+        
+        departmentKPIs[departmentId].push(newKPI);
+        resolve(newKPI);
+      }, 100);
+    });
+  },
+
+  updateDepartmentKPI: async (departmentId, kpiId, updates) => {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (!departmentKPIs[departmentId]) {
+          departmentKPIs[departmentId] = [];
+        }
+        
+        const index = departmentKPIs[departmentId].findIndex(k => k.id === kpiId);
+        if (index !== -1) {
+          departmentKPIs[departmentId][index] = { 
+            ...departmentKPIs[departmentId][index], 
+            ...updates,
+            updatedAt: new Date().toISOString(),
+          };
+          resolve(departmentKPIs[departmentId][index]);
+        } else {
+          reject(new Error('KPI not found'));
+        }
+      }, 100);
+    });
+  },
+
+  deleteDepartmentKPI: async (departmentId, kpiId) => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (departmentKPIs[departmentId]) {
+          departmentKPIs[departmentId] = departmentKPIs[departmentId].filter(k => k.id !== kpiId);
+        }
+        resolve();
+      }, 100);
+    });
+  },
 };
 
 export const kpiService = {

@@ -61,10 +61,10 @@ const Login = () => {
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: 48 }}>
               <Title level={1} style={{ color: '#1890ff', marginBottom: 8 }}>
-                🎯 KPI Management System
+                🎯 KPIs Management System
               </Title>
               <Paragraph style={{ fontSize: 16, color: '#666' }}>
-                Hệ thống quản lý chỉ số hiệu suất theo mô hình Balanced Scorecard
+                Hệ thống quản lý chỉ số hiệu suất theo mô hình Quản trị tự động
               </Paragraph>
             </div>
 
@@ -151,7 +151,7 @@ const Login = () => {
             <Divider style={{ margin: '32px 0' }} />
             <div style={{ textAlign: 'center' }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Hệ thống Quản lý KPI © 2024 | Balanced Scorecard Framework
+                Hệ thống Quản lý KPI © 2026 | Được phát triển bởi Giang Tuấn Huy - 0869975003
               </Text>
             </div>
           </Card>
