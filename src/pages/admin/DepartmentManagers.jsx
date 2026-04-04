@@ -26,6 +26,7 @@ import { apiClient } from '../../services/apiClient';
 import { formatLog } from '../../utils/logFormatter';
 
 const DepartmentManagers = () => {
+  const [allUsers, setAllUsers] = useState([]);
   const [users, setUsers] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -42,6 +43,7 @@ const DepartmentManagers = () => {
         departmentService.getDepartments(),
         apiClient.get('/user-profiles').then((r) => r.data).catch(() => []),
       ]);
+      setAllUsers(userRes);
       setUsers(userRes.filter((u) => u.role === ROLES.DEPARTMENT_MANAGER));
       setDepartments(deptRes);
       setProfiles(profileRes);
@@ -66,12 +68,30 @@ const DepartmentManagers = () => {
     return map;
   }, [profiles]);
 
+  const managedCounts = useMemo(() => {
+    const counts = {};
+    allUsers.forEach((u) => {
+      if (u.role !== ROLES.EMPLOYEE || !u.managedBy) return;
+      const mId =
+        typeof u.managedBy === 'object'
+          ? u.managedBy._id || u.managedBy.id || u.managedBy
+          : u.managedBy;
+      counts[mId] = (counts[mId] || 0) + 1;
+    });
+    return counts;
+  }, [allUsers]);
+
   const columns = [
     { title: 'Username', dataIndex: 'username', key: 'username', width: 140 },
     { title: 'Email', dataIndex: 'email', key: 'email', width: 200 },
     { title: 'Phòng ban', dataIndex: ['department', 'name'], key: 'department', render:(_, r)=> r?.department?.name || '—' },
     { title: 'Họ tên', key: 'fullName', render:(_,r)=> profilesMap[r._id]?.fullName || '—' },
     { title: 'Điện thoại', key: 'phone', render:(_,r)=> profilesMap[r._id]?.phone || '—' },
+    {
+      title: 'Số nhân viên quản lý',
+      key: 'managedCount',
+      render: (_, record) => managedCounts[record._id] ?? 0,
+    },
     {
       title: 'Hành động',
       key: 'action',
@@ -139,8 +159,8 @@ const DepartmentManagers = () => {
       email: values.email,
       role: ROLES.DEPARTMENT_MANAGER,
       password: values.password || undefined,
-      departmentId: values.departmentId || undefined,
-      departmentName: values.departmentName?.trim() || undefined,
+      departmentId: values.departmentId,
+      departmentName: undefined,
       managedBy: undefined, // set server side to current admin
     };
 
@@ -235,7 +255,7 @@ const DepartmentManagers = () => {
       >
         <Form layout="vertical" form={form} onFinish={handleSubmit}>
           <Form.Item name="username" label="Username" rules={[{ required: true }]}>
-            <Input placeholder="Nhập username" />
+            <Input placeholder="Nhập username" disabled={!!editingUser} />
           </Form.Item>
           <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
             <Input placeholder="Nhập email" />
@@ -251,21 +271,18 @@ const DepartmentManagers = () => {
             </Form.Item>
           )}
           <Divider />
-          <Form.Item label="Phòng ban (chọn hoặc nhập mới)">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Form.Item name="departmentId" noStyle>
-                <Select
-                  allowClear
-                  placeholder="Chọn phòng ban sẵn có"
-                  options={departments.map((d) => ({ label: d.name, value: d._id }))}
-                  showSearch
-                  optionFilterProp="label"
-                />
-              </Form.Item>
-              <Form.Item name="departmentName" noStyle>
-                <Input placeholder="Hoặc nhập tên phòng ban mới" />
-              </Form.Item>
-            </Space>
+          <Form.Item
+            name="departmentId"
+            label="Phòng ban"
+            rules={[{ required: true, message: 'Chọn phòng ban' }]}
+          >
+            <Select
+              allowClear
+              placeholder="Chọn phòng ban sẵn có"
+              options={departments.map((d) => ({ label: d.name, value: d._id }))}
+              showSearch
+              optionFilterProp="label"
+            />
           </Form.Item>
 
           <Divider>Thông tin hồ sơ</Divider>

@@ -162,11 +162,9 @@ const UserManagement = () => {
     form.setFieldsValue({
       username: user.username,
       email: user.email,
-      role: user.role,
       departmentId: user?.department?._id,
-      departmentName: '',
+      managedBy: user?.managedBy || null,
       fullName: profile.fullName,
-      employeeCode: profile.employeeCode,
       title: profile.title,
       phone: profile.phone,
       address: profile.address,
@@ -270,22 +268,29 @@ const UserManagement = () => {
   };
 
   return (
-    <Card title="Quản lý Nhân viên" extra={
-      <Space>
-        <Button icon={<ReloadOutlined />} onClick={loadData} />
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-        setEditingUser(null);
-        form.resetFields();
-        setModalOpen(true);
-      }}>
-          Thêm nhân viên
-        </Button>
-      </Space>
-    }>
+    <Card
+      title="Quản lý Nhân viên"
+      extra={
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={loadData} />
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setEditingUser(null);
+              form.resetFields();
+              setModalOpen(true);
+            }}
+          >
+            Thêm nhân viên
+          </Button>
+        </Space>
+      }
+    >
       <Table
         columns={columns}
         dataSource={filteredUsers}
-        rowKey={(r) => r._id || r.id}
+        rowKey={r => r._id || r.id}
         loading={loading}
       />
       <Modal
@@ -299,7 +304,7 @@ const UserManagement = () => {
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item name="username" label="Username" rules={[{ required: true }]}>
-            <Input placeholder="Nhập username" />
+            <Input placeholder="Nhập username" disabled={!!editingUser} />
           </Form.Item>
           <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
             <Input placeholder="Nhập email" />
@@ -310,87 +315,85 @@ const UserManagement = () => {
             </Form.Item>
           )}
           {editingUser && (
-            <Form.Item name="password" label="Mật khẩu (để trống nếu giữ nguyên)" rules={[{ required: false }]}>
+            <Form.Item
+              name="password"
+              label="Mật khẩu (để trống nếu giữ nguyên)"
+              rules={[{ required: false }]}
+            >
               <Input.Password placeholder="Để trống nếu không đổi" />
             </Form.Item>
           )}
           <Divider />
-        <Form.Item
-          name="departmentId"
-          label="Phòng ban"
-          rules={[{ required: true, message: 'Chọn phòng ban' }]}
-        >
-          <Select
-            allowClear
-            placeholder="Chọn phòng ban sẵn có"
-            options={departments.map((d) => ({ label: d.name, value: d._id }))}
-            showSearch
-            optionFilterProp="label"
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="managedBy"
-          label="Quản lý bởi (Trưởng phòng)"
-          rules={[{ required: true, message: 'Chọn người quản lý' }]}
-        >
-          <Select
-            placeholder="Chọn trưởng phòng"
-            options={managerOptions}
-            showSearch
-            optionFilterProp="label"
-          />
-        </Form.Item>
-
-        <Divider>Thông tin hồ sơ</Divider>
-        <Form.Item name="fullName" label="Họ tên đầy đủ">
-          <Input placeholder="VD: Nguyễn Văn A" />
-        </Form.Item>
-        <Form.Item name="employeeCode" label="Mã nhân viên">
-          <Input placeholder="VD: NV001" />
-        </Form.Item>
-        <Form.Item name="title" label="Chức danh">
-          <Input placeholder="VD: Trưởng phòng" />
-        </Form.Item>
-        <Form.Item name="phone" label="Điện thoại">
-          <Input placeholder="VD: 0901234567" />
-        </Form.Item>
-        <Form.Item name="address" label="Địa chỉ">
-          <Input placeholder="Nhập địa chỉ" />
-        </Form.Item>
-        <Form.Item name="avatarUrl" label="Ảnh đại diện (URL)">
-          <Input placeholder="https://..." />
-        </Form.Item>
-        <Space size="large" style={{ display: 'flex' }}>
-          <Form.Item name="gender" label="Giới tính" style={{ flex: 1 }}>
+          <Form.Item
+            name="departmentId"
+            label="Phòng ban"
+            rules={[{ required: true, message: 'Chọn phòng ban' }]}
+          >
             <Select
               allowClear
-              options={[
-                { value: 'male', label: 'Nam' },
-                { value: 'female', label: 'Nữ' },
-                { value: 'other', label: 'Khác' },
-              ]}
+              placeholder="Chọn phòng ban sẵn có"
+              options={departments.map(d => ({ label: d.name, value: d._id }))}
+              showSearch
+              optionFilterProp="label"
             />
           </Form.Item>
-          <Form.Item name="status" label="Trạng thái" style={{ flex: 1 }}>
+
+          <Form.Item
+            name="managedBy"
+            label="Quản lý bởi (Trưởng phòng)"
+            rules={[{ required: true, message: 'Chọn người quản lý' }]}
+          >
             <Select
-              allowClear
-              options={[
-                { value: 'active', label: 'Đang làm' },
-                { value: 'on_leave', label: 'Nghỉ phép' },
-                { value: 'inactive', label: 'Nghỉ' },
-              ]}
+              placeholder="Chọn trưởng phòng"
+              options={managerOptions}
+              showSearch
+              optionFilterProp="label"
             />
           </Form.Item>
-        </Space>
-        <Space size="large" style={{ display: 'flex' }}>
-          <Form.Item name="dateOfBirth" label="Ngày sinh" style={{ flex: 1 }}>
-            <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+
+          <Divider>Thông tin hồ sơ</Divider>
+          <Form.Item name="fullName" label="Họ tên đầy đủ">
+            <Input placeholder="VD: Nguyễn Văn A" />
           </Form.Item>
-          <Form.Item name="startDate" label="Ngày vào làm" style={{ flex: 1 }}>
-            <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+          <Form.Item name="phone" label="Điện thoại">
+            <Input placeholder="VD: 0901234567" />
           </Form.Item>
-        </Space>
+          <Form.Item name="address" label="Địa chỉ">
+            <Input placeholder="Nhập địa chỉ" />
+          </Form.Item>
+          <Form.Item name="avatarUrl" label="Ảnh đại diện (URL)">
+            <Input placeholder="https://..." />
+          </Form.Item>
+          <Space size="large" style={{ display: 'flex' }}>
+            <Form.Item name="gender" label="Giới tính" style={{ flex: 1 }}>
+              <Select
+                allowClear
+                options={[
+                  { value: 'male', label: 'Nam' },
+                  { value: 'female', label: 'Nữ' },
+                  { value: 'other', label: 'Khác' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item name="status" label="Trạng thái" style={{ flex: 1 }}>
+              <Select
+                allowClear
+                options={[
+                  { value: 'active', label: 'Đang làm' },
+                  { value: 'on_leave', label: 'Nghỉ phép' },
+                  { value: 'inactive', label: 'Nghỉ' },
+                ]}
+              />
+            </Form.Item>
+          </Space>
+          <Space size="large" style={{ display: 'flex' }}>
+            <Form.Item name="dateOfBirth" label="Ngày sinh" style={{ flex: 1 }}>
+              <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="startDate" label="Ngày vào làm" style={{ flex: 1 }}>
+              <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+            </Form.Item>
+          </Space>
         </Form>
       </Modal>
     </Card>
