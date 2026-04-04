@@ -11,7 +11,6 @@ import {
   Select,
   Divider,
   DatePicker,
-  Tag,
 } from 'antd';
 import {
   PlusOutlined,
@@ -23,11 +22,10 @@ import dayjs from 'dayjs';
 import { roleLabels, ROLES } from '../../constants/roles';
 import { userService } from '../../services/userService';
 import { departmentService } from '../../services/departmentService';
-import { formatLog } from '../../utils/logFormatter';
 import { apiClient } from '../../services/apiClient';
-import { useAuth } from '../../contexts/AuthContext';
+import { formatLog } from '../../utils/logFormatter';
 
-const UserManagement = () => {
+const DepartmentManagers = () => {
   const [users, setUsers] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -35,12 +33,6 @@ const UserManagement = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
-  const { user: currentUser } = useAuth();
-
-  const roleOptions = useMemo(
-    () => Object.values(ROLES).map((r) => ({ label: roleLabels[r], value: r })),
-    [],
-  );
 
   const loadData = async () => {
     setLoading(true);
@@ -50,11 +42,11 @@ const UserManagement = () => {
         departmentService.getDepartments(),
         apiClient.get('/user-profiles').then((r) => r.data).catch(() => []),
       ]);
-      setUsers(userRes);
+      setUsers(userRes.filter((u) => u.role === ROLES.DEPARTMENT_MANAGER));
       setDepartments(deptRes);
       setProfiles(profileRes);
     } catch (err) {
-      console.error(formatLog('Load users/departments failed', err.message));
+      console.error(formatLog('Load managers failed', err.message));
       message.error('Tải dữ liệu thất bại');
     } finally {
       setLoading(false);
@@ -74,70 +66,12 @@ const UserManagement = () => {
     return map;
   }, [profiles]);
 
-  const filteredUsers = useMemo(() => {
-    // Quản lý cấp cao: không thấy/sửa/xóa senior_manager (kể cả mình), nhưng thấy các role thấp hơn.
-    if (!currentUser) return users;
-    const isAdmin = currentUser.role === ROLES.SENIOR_MANAGER;
-    if (!isAdmin) return users;
-    return users.filter((u) => u.role === ROLES.EMPLOYEE);
-  }, [users, currentUser]);
-
-  const managerOptions = useMemo(
-    () =>
-      users
-        .filter((u) => u.role === ROLES.DEPARTMENT_MANAGER)
-        .map((u) => ({ value: u._id, label: `${u.username} (${u.email})` })),
-    [users],
-  );
-
-  const managersMap = useMemo(() => {
-    const map = {};
-    users
-      .filter((u) => u.role === ROLES.DEPARTMENT_MANAGER)
-      .forEach((u) => {
-        map[u._id] = `${u.username}`;
-      });
-    return map;
-  }, [users]);
-
   const columns = [
     { title: 'Username', dataIndex: 'username', key: 'username', width: 140 },
     { title: 'Email', dataIndex: 'email', key: 'email', width: 200 },
-    { title: 'Quản lý bởi', key: 'managedBy', render: (_, r) => managersMap[r.managedBy] || '—' },
-    {
-      title: 'Phòng ban',
-      dataIndex: ['department', 'name'],
-      key: 'department',
-      render: (_, record) => record?.department?.name || record.departmentName || '—',
-    },
-    {
-      title: 'Họ tên',
-      key: 'fullName',
-      render: (_, record) => profilesMap[record._id]?.fullName || '—',
-    },
-    {
-      title: 'Mã NV',
-      key: 'employeeCode',
-      width: 100,
-      render: (_, record) => profilesMap[record._id]?.employeeCode || '—',
-    },
-    {
-      title: 'Trạng thái',
-      key: 'status',
-      render: (_, record) => {
-        const status = profilesMap[record._id]?.status;
-        if (!status) return '—';
-        const color =
-          status === 'active' ? 'green' : status === 'on_leave' ? 'orange' : 'red';
-        const label =
-          status === 'active'
-            ? 'Đang làm'
-            : status === 'on_leave'
-            ? 'Nghỉ phép'
-            : 'Nghỉ';
-        return <Tag color={color}>{label}</Tag>;
-      },
-    },
+    { title: 'Phòng ban', dataIndex: ['department', 'name'], key: 'department', render:(_, r)=> r?.department?.name || '—' },
+    { title: 'Họ tên', key: 'fullName', render:(_,r)=> profilesMap[r._id]?.fullName || '—' },
+    { title: 'Điện thoại', key: 'phone', render:(_,r)=> profilesMap[r._id]?.phone || '—' },
     {
       title: 'Hành động',
       key: 'action',
@@ -162,11 +96,9 @@ const UserManagement = () => {
     form.setFieldsValue({
       username: user.username,
       email: user.email,
-      role: user.role,
       departmentId: user?.department?._id,
       departmentName: '',
       fullName: profile.fullName,
-      employeeCode: profile.employeeCode,
       title: profile.title,
       phone: profile.phone,
       address: profile.address,
@@ -181,14 +113,9 @@ const UserManagement = () => {
 
   const handleDelete = (record) => {
     const id = record._id || record.id;
-    if (record.role === ROLES.SENIOR_MANAGER && id !== currentUser?.id) {
-      message.warning('Không được xóa tài khoản quản lý cấp cao khác');
-      return;
-    }
-
     Modal.confirm({
       title: 'Xác nhận xóa',
-      content: 'Bạn có chắc chắn muốn xóa người dùng này?',
+      content: 'Bạn có chắc chắn muốn xóa quản lý phòng ban này?',
       onOk() {
         userService
           .deleteUser(id)
@@ -199,9 +126,9 @@ const UserManagement = () => {
             }
             setUsers(users.filter((u) => u._id !== id && u.id !== id));
             setProfiles(profiles.filter((p) => p.user !== id));
-            message.success('Xóa người dùng thành công');
+            message.success('Xóa thành công');
           })
-          .catch(() => message.error('Xóa người dùng thất bại'));
+          .catch(() => message.error('Xóa thất bại'));
       },
     });
   };
@@ -210,11 +137,11 @@ const UserManagement = () => {
     const payload = {
       username: values.username,
       email: values.email,
-      role: ROLES.EMPLOYEE,
+      role: ROLES.DEPARTMENT_MANAGER,
       password: values.password || undefined,
-      departmentId: values.departmentId,
-      departmentName: undefined,
-      managedBy: values.managedBy || undefined,
+      departmentId: values.departmentId || undefined,
+      departmentName: values.departmentName?.trim() || undefined,
+      managedBy: undefined, // set server side to current admin
     };
 
     try {
@@ -259,45 +186,54 @@ const UserManagement = () => {
         setProfiles([...profiles, createdProfile]);
       }
 
-      message.success(editingUser ? 'Cập nhật người dùng thành công' : 'Thêm người dùng thành công');
+      message.success(editingUser ? 'Cập nhật thành công' : 'Thêm quản lý phòng ban thành công');
       setModalOpen(false);
       form.resetFields();
       setEditingUser(null);
       loadData();
     } catch (err) {
-      message.error(err.message || 'Lưu người dùng thất bại');
+      message.error(err.message || 'Lưu thất bại');
     }
   };
 
   return (
-    <Card title="Quản lý Nhân viên" extra={
-      <Space>
-        <Button icon={<ReloadOutlined />} onClick={loadData} />
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-        setEditingUser(null);
-        form.resetFields();
-        setModalOpen(true);
-      }}>
-          Thêm nhân viên
-        </Button>
-      </Space>
-    }>
+    <Card
+      title="Quản lý Trưởng phòng"
+      extra={
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={loadData} />
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setEditingUser(null);
+              form.resetFields();
+              setModalOpen(true);
+            }}
+          >
+            Thêm trưởng phòng
+          </Button>
+        </Space>
+      }
+    >
       <Table
         columns={columns}
-        dataSource={filteredUsers}
+        dataSource={users}
         rowKey={(r) => r._id || r.id}
         loading={loading}
       />
+
       <Modal
-        title={editingUser ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên'}
+        title={editingUser ? 'Chỉnh sửa trưởng phòng' : 'Thêm trưởng phòng'}
         open={modalOpen}
         onCancel={() => {
           setModalOpen(false);
           form.resetFields();
         }}
         onOk={() => form.submit()}
+        width={720}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Form layout="vertical" form={form} onFinish={handleSubmit}>
           <Form.Item name="username" label="Username" rules={[{ required: true }]}>
             <Input placeholder="Nhập username" />
           </Form.Item>
@@ -315,86 +251,73 @@ const UserManagement = () => {
             </Form.Item>
           )}
           <Divider />
-        <Form.Item
-          name="departmentId"
-          label="Phòng ban"
-          rules={[{ required: true, message: 'Chọn phòng ban' }]}
-        >
-          <Select
-            allowClear
-            placeholder="Chọn phòng ban sẵn có"
-            options={departments.map((d) => ({ label: d.name, value: d._id }))}
-            showSearch
-            optionFilterProp="label"
-          />
-        </Form.Item>
+          <Form.Item label="Phòng ban (chọn hoặc nhập mới)">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Form.Item name="departmentId" noStyle>
+                <Select
+                  allowClear
+                  placeholder="Chọn phòng ban sẵn có"
+                  options={departments.map((d) => ({ label: d.name, value: d._id }))}
+                  showSearch
+                  optionFilterProp="label"
+                />
+              </Form.Item>
+              <Form.Item name="departmentName" noStyle>
+                <Input placeholder="Hoặc nhập tên phòng ban mới" />
+              </Form.Item>
+            </Space>
+          </Form.Item>
 
-        <Form.Item
-          name="managedBy"
-          label="Quản lý bởi (Trưởng phòng)"
-          rules={[{ required: true, message: 'Chọn người quản lý' }]}
-        >
-          <Select
-            placeholder="Chọn trưởng phòng"
-            options={managerOptions}
-            showSearch
-            optionFilterProp="label"
-          />
-        </Form.Item>
-
-        <Divider>Thông tin hồ sơ</Divider>
-        <Form.Item name="fullName" label="Họ tên đầy đủ">
-          <Input placeholder="VD: Nguyễn Văn A" />
-        </Form.Item>
-        <Form.Item name="employeeCode" label="Mã nhân viên">
-          <Input placeholder="VD: NV001" />
-        </Form.Item>
-        <Form.Item name="title" label="Chức danh">
-          <Input placeholder="VD: Trưởng phòng" />
-        </Form.Item>
-        <Form.Item name="phone" label="Điện thoại">
-          <Input placeholder="VD: 0901234567" />
-        </Form.Item>
-        <Form.Item name="address" label="Địa chỉ">
-          <Input placeholder="Nhập địa chỉ" />
-        </Form.Item>
-        <Form.Item name="avatarUrl" label="Ảnh đại diện (URL)">
-          <Input placeholder="https://..." />
-        </Form.Item>
-        <Space size="large" style={{ display: 'flex' }}>
-          <Form.Item name="gender" label="Giới tính" style={{ flex: 1 }}>
-            <Select
-              allowClear
-              options={[
-                { value: 'male', label: 'Nam' },
-                { value: 'female', label: 'Nữ' },
-                { value: 'other', label: 'Khác' },
-              ]}
-            />
+          <Divider>Thông tin hồ sơ</Divider>
+          <Form.Item name="fullName" label="Họ tên đầy đủ">
+            <Input placeholder="VD: Nguyễn Văn A" />
           </Form.Item>
-          <Form.Item name="status" label="Trạng thái" style={{ flex: 1 }}>
-            <Select
-              allowClear
-              options={[
-                { value: 'active', label: 'Đang làm' },
-                { value: 'on_leave', label: 'Nghỉ phép' },
-                { value: 'inactive', label: 'Nghỉ' },
-              ]}
-            />
+          <Form.Item name="title" label="Chức danh">
+            <Input placeholder="VD: Trưởng phòng" />
           </Form.Item>
-        </Space>
-        <Space size="large" style={{ display: 'flex' }}>
-          <Form.Item name="dateOfBirth" label="Ngày sinh" style={{ flex: 1 }}>
-            <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+          <Form.Item name="phone" label="Điện thoại">
+            <Input placeholder="VD: 0901234567" />
           </Form.Item>
-          <Form.Item name="startDate" label="Ngày vào làm" style={{ flex: 1 }}>
-            <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+          <Form.Item name="address" label="Địa chỉ">
+            <Input placeholder="Nhập địa chỉ" />
           </Form.Item>
-        </Space>
+          <Form.Item name="avatarUrl" label="Ảnh đại diện (URL)">
+            <Input placeholder="https://..." />
+          </Form.Item>
+          <Space size="large" style={{ display: 'flex' }}>
+            <Form.Item name="gender" label="Giới tính" style={{ flex: 1 }}>
+              <Select
+                allowClear
+                options={[
+                  { value: 'male', label: 'Nam' },
+                  { value: 'female', label: 'Nữ' },
+                  { value: 'other', label: 'Khác' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item name="status" label="Trạng thái" style={{ flex: 1 }}>
+              <Select
+                allowClear
+                options={[
+                  { value: 'active', label: 'Đang làm' },
+                  { value: 'on_leave', label: 'Nghỉ phép' },
+                  { value: 'inactive', label: 'Nghỉ' },
+                ]}
+              />
+            </Form.Item>
+          </Space>
+          <Space size="large" style={{ display: 'flex' }}>
+            <Form.Item name="dateOfBirth" label="Ngày sinh" style={{ flex: 1 }}>
+              <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="startDate" label="Ngày vào làm" style={{ flex: 1 }}>
+              <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+            </Form.Item>
+          </Space>
         </Form>
       </Modal>
     </Card>
   );
 };
 
-export default UserManagement;
+export default DepartmentManagers;

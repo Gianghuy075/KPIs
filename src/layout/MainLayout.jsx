@@ -133,9 +133,14 @@ const MainLayout = ({ children }) => {
           label: 'Quản lý Nhân sự',
           children: [
             {
-              key: '/admin/users',
+              key: '/admin/employee',
               icon: <UserOutlined />,
-              label: 'Quản lý Người dùng',
+              label: 'Quản lý Nhân viên',
+            },
+            {
+              key: '/admin/department-managers',
+              icon: <TeamOutlined />,
+              label: 'Quản lý Trưởng phòng',
             },
             {
               key: '/admin/departments',

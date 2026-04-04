@@ -5,6 +5,7 @@ import Dashboard from '../pages/Dashboard';
 import Login from '../pages/Login';
 import UserManagement from '../pages/admin/UserManagement';
 import DepartmentManagement from '../pages/admin/DepartmentManagement';
+import DepartmentManagers from '../pages/admin/DepartmentManagers';
 import KPIManagement from '../pages/admin/KPIManagement';
 import KPIDashboards from '../pages/admin/KPIDashboards';
 import DepartmentKPIDashboard from '../pages/admin/DepartmentKPIDashboard';
@@ -38,7 +39,8 @@ const AppRouter = () => {
           {/* Admin Routes - chỉ cho Executive */}
           {user?.role === 'senior_manager' && (
             <>
-              <Route path="/admin/users" element={<UserManagement />} />
+              <Route path="/admin/employee" element={<UserManagement />} />
+              <Route path="/admin/department-managers" element={<DepartmentManagers />} />
               <Route path="/admin/departments" element={<DepartmentManagement />} />
               <Route path="/admin/notifications" element={<NotificationManagement />} />
               <Route path="/admin/kpi-management" element={<KPIManagement />} />
