@@ -36,7 +36,7 @@ const AppRouter = () => {
           <Route path="/dashboard" element={<Dashboard />} />
           
           {/* Admin Routes - chỉ cho Executive */}
-          {user?.role === 'executive' && (
+          {user?.role === 'senior_manager' && (
             <>
               <Route path="/admin/users" element={<UserManagement />} />
               <Route path="/admin/departments" element={<DepartmentManagement />} />

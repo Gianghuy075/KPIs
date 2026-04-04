@@ -58,7 +58,7 @@ export const NotificationProvider = ({ children }) => {
     ));
   };
 
-  // Tạo thông báo mới (cho executive)
+  // Tạo thông báo mới (cho quản lý cấp cao)
   const createNotification = async (notificationData) => {
     try {
       const newNotification = await notificationService.createNotification(notificationData);

@@ -1,23 +1,60 @@
-import React, { useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Card, message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Table, Button, Space, Modal, Form, Input, Card, message, Select, Divider } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { roleLabels, ROLES } from '../../constants/roles';
+import { userService } from '../../services/userService';
+import { departmentService } from '../../services/departmentService';
+import { formatLog } from '../../utils/logFormatter';
 
 const UserManagement = () => {
-  const [users, setUsers] = useState([
-    { id: 1, name: 'Nguyễn Văn A', email: 'nguyena@company.com', role: 'Quản lý cấp cao', department: 'Ban Lãnh đạo' },
-    { id: 2, name: 'Trần Thị B', email: 'tranb@company.com', role: 'Quản lý phòng ban', department: 'Kinh doanh' },
-    { id: 3, name: 'Lê Văn C', email: 'levan@company.com', role: 'Nhân viên', department: 'Kỹ thuật' },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
 
+  const roleOptions = useMemo(
+    () => Object.values(ROLES).map((r) => ({ label: roleLabels[r], value: r })),
+    [],
+  );
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [userRes, deptRes] = await Promise.all([
+        userService.getUsers(),
+        departmentService.getDepartments(),
+      ]);
+      setUsers(userRes);
+      setDepartments(deptRes);
+    } catch (err) {
+      console.error(formatLog('Load users/departments failed', err.message));
+      message.error('Tải dữ liệu thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const columns = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-    { title: 'Tên', dataIndex: 'name', key: 'name' },
+    { title: 'Username', dataIndex: 'username', key: 'username' },
     { title: 'Email', dataIndex: 'email', key: 'email' },
-    { title: 'Vai trò', dataIndex: 'role', key: 'role' },
-    { title: 'Phòng ban', dataIndex: 'department', key: 'department' },
+    {
+      title: 'Vai trò',
+      dataIndex: 'role',
+      key: 'role',
+      render: (role) => roleLabels[role] || role,
+    },
+    {
+      title: 'Phòng ban',
+      dataIndex: ['department', 'name'],
+      key: 'department',
+      render: (_, record) => record?.department?.name || record.departmentName || '—',
+    },
     {
       title: 'Hành động',
       key: 'action',
@@ -33,7 +70,13 @@ const UserManagement = () => {
 
   const handleEdit = (user) => {
     setEditingUser(user);
-    form.setFieldsValue(user);
+    form.setFieldsValue({
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      departmentId: user?.department?._id,
+      departmentName: '',
+    });
     setModalOpen(true);
   };
 
@@ -42,36 +85,65 @@ const UserManagement = () => {
       title: 'Xác nhận xóa',
       content: 'Bạn có chắc chắn muốn xóa người dùng này?',
       onOk() {
-        setUsers(users.filter(u => u.id !== id));
-        message.success('Xóa người dùng thành công');
+        userService
+          .deleteUser(id)
+          .then(() => {
+            setUsers(users.filter((u) => u._id !== id && u.id !== id));
+            message.success('Xóa người dùng thành công');
+          })
+          .catch(() => message.error('Xóa người dùng thất bại'));
       },
     });
   };
 
-  const handleSubmit = (values) => {
-    if (editingUser) {
-      setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...values } : u));
-      message.success('Cập nhật người dùng thành công');
-    } else {
-      setUsers([...users, { id: Date.now(), ...values }]);
-      message.success('Thêm người dùng thành công');
+  const handleSubmit = async (values) => {
+    const payload = {
+      username: values.username,
+      email: values.email,
+      role: values.role,
+      password: values.password || undefined,
+      departmentId: values.departmentId || undefined,
+      departmentName: values.departmentName?.trim() || undefined,
+    };
+
+    try {
+      if (editingUser) {
+        const updated = await userService.updateUser(editingUser._id || editingUser.id, payload);
+        setUsers(users.map((u) => (u._id === updated._id ? updated : u)));
+        message.success('Cập nhật người dùng thành công');
+      } else {
+        if (!payload.password) {
+          message.warning('Vui lòng nhập mật khẩu cho người dùng mới');
+          return;
+        }
+        const created = await userService.createUser(payload);
+        setUsers([...users, created]);
+        message.success('Thêm người dùng thành công');
+      }
+      setModalOpen(false);
+      form.resetFields();
+      setEditingUser(null);
+      // reload departments list if new created
+      loadData();
+    } catch (err) {
+      message.error(err.message || 'Lưu người dùng thất bại');
     }
-    setModalOpen(false);
-    form.resetFields();
-    setEditingUser(null);
   };
 
   return (
     <Card title="Quản lý Người dùng" extra={
-      <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+      <Space>
+        <Button icon={<ReloadOutlined />} onClick={loadData} />
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => {
         setEditingUser(null);
         form.resetFields();
         setModalOpen(true);
       }}>
-        Thêm người dùng
-      </Button>
+          Thêm người dùng
+        </Button>
+      </Space>
     }>
-      <Table columns={columns} dataSource={users} rowKey="id" />
+      <Table columns={columns} dataSource={users} rowKey={(r) => r._id || r.id} loading={loading} />
       <Modal
         title={editingUser ? 'Chỉnh sửa người dùng' : 'Thêm người dùng'}
         open={modalOpen}
@@ -82,17 +154,41 @@ const UserManagement = () => {
         onOk={() => form.submit()}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item name="name" label="Tên" rules={[{ required: true }]}>
-            <Input placeholder="Nhập tên" />
+          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+            <Input placeholder="Nhập username" />
           </Form.Item>
           <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}>
             <Input placeholder="Nhập email" />
           </Form.Item>
           <Form.Item name="role" label="Vai trò" rules={[{ required: true }]}>
-            <Input placeholder="Nhập vai trò" />
+            <Select options={roleOptions} placeholder="Chọn vai trò" />
           </Form.Item>
-          <Form.Item name="department" label="Phòng ban" rules={[{ required: true }]}>
-            <Input placeholder="Nhập phòng ban" />
+          {!editingUser && (
+            <Form.Item name="password" label="Mật khẩu" rules={[{ required: true }]}>
+              <Input.Password placeholder="Nhập mật khẩu" />
+            </Form.Item>
+          )}
+          {editingUser && (
+            <Form.Item name="password" label="Mật khẩu (để trống nếu giữ nguyên)" rules={[{ required: false }]}>
+              <Input.Password placeholder="Để trống nếu không đổi" />
+            </Form.Item>
+          )}
+          <Divider />
+          <Form.Item label="Phòng ban (chọn hoặc nhập mới)">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Form.Item name="departmentId" noStyle>
+                <Select
+                  allowClear
+                  placeholder="Chọn phòng ban sẵn có"
+                  options={departments.map((d) => ({ label: d.name, value: d._id }))}
+                  showSearch
+                  optionFilterProp="label"
+                />
+              </Form.Item>
+              <Form.Item name="departmentName" noStyle>
+                <Input placeholder="Hoặc nhập tên phòng ban mới" />
+              </Form.Item>
+            </Space>
           </Form.Item>
         </Form>
       </Modal>

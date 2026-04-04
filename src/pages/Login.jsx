@@ -1,43 +1,38 @@
-import React from 'react';
-import { Button, Card, Row, Col, Typography, Space, Divider, Layout, Empty } from 'antd';
-import { UserOutlined, TeamOutlined, CrownOutlined } from '@ant-design/icons';
+import React, { useState } from 'react';
+import { Button, Card, Typography, Layout, Form, Input, Space, Divider, Alert, message } from 'antd';
+import { LockOutlined, UserOutlined, LoginOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { roleLabels } from '../constants/roles';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Paragraph, Text } = Typography;
 const { Content } = Layout;
+
+const redirectByRole = {
+  senior_manager: '/dashboard',
+  department_manager: '/dashboard',
+  employee: '/dashboard',
+};
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const roles = [
-    {
-      key: 'executive',
-      title: 'Trang quản lý cấp cao',
-      description: 'Xem toàn bộ KPI từ tất cả các góc độ BSC',
-      icon: <CrownOutlined style={{ fontSize: 48, color: '#faad14' }} />,
-      color: '#faad14',
-    },
-    {
-      key: 'manager',
-      title: 'Trang quản lý phòng ban',
-      description: 'Quản lý KPI của phòng ban',
-      icon: <TeamOutlined style={{ fontSize: 48, color: '#1890ff' }} />,
-      color: '#1890ff',
-    },
-    {
-      key: 'employee',
-      title: 'Trang nhân viên',
-      description: 'Xem KPI cá nhân và mục tiêu',
-      icon: <UserOutlined style={{ fontSize: 48, color: '#52c41a' }} />,
-      color: '#52c41a',
-    },
-  ];
-
-  const handleLogin = (role) => {
-    login(role);
-    navigate('/dashboard');
+  const onFinish = async (values) => {
+    setLoading(true);
+    setError('');
+    try {
+      const user = await login(values.identifier, values.password);
+      const target = redirectByRole[user.role] || '/dashboard';
+      message.success(`Chào ${user.name || 'bạn'} (${roleLabels[user.role] || user.role})`);
+      navigate(target, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Đăng nhập thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,109 +46,83 @@ const Login = () => {
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         }}
       >
-        <div style={{ width: '100%', maxWidth: 1000 }}>
+        <div style={{ width: '100%', maxWidth: 480 }}>
           <Card
             style={{
               borderRadius: 12,
               boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
             }}
           >
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: 48 }}>
-              <Title level={1} style={{ color: '#1890ff', marginBottom: 8 }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <Title level={2} style={{ color: '#1890ff', marginBottom: 8 }}>
                 🎯 KPIs Management System
               </Title>
-              <Paragraph style={{ fontSize: 16, color: '#666' }}>
-                Hệ thống quản lý chỉ số hiệu suất theo mô hình Quản trị tự động
+              <Paragraph style={{ fontSize: 16, color: '#666', marginBottom: 0 }}>
+                Đăng nhập bằng email hoặc username
               </Paragraph>
             </div>
 
-            <Divider style={{ margin: '24px 0' }} />
+            <Divider style={{ margin: '16px 0' }} />
 
-            {/* Role Selection */}
-            <div style={{ marginBottom: 4 }}>
-              <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 24, textAlign: 'center' }}>
-                Vui lòng chọn vai trò của bạn:
-              </Text>
-            </div>
+            {error && (
+              <Alert
+                type="error"
+                message="Đăng nhập không thành công"
+                description={error}
+                showIcon
+                closable
+                style={{ marginBottom: 16 }}
+              />
+            )}
 
-            <Row gutter={[24, 24]} justify="center">
-              {roles.map((role) => (
-                <Col xs={24} sm={24} md={8} key={role.key}>
-                  <Card
-                    hoverable
-                    style={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      cursor: 'pointer',
-                      border: `2px solid ${role.color}20`,
-                      transition: 'all 0.3s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = `0 8px 24px ${role.color}40`;
-                      e.currentTarget.style.borderColor = role.color;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = 'none';
-                      e.currentTarget.style.borderColor = `${role.color}20`;
-                    }}
-                  >
-                    <Space
-                      direction="vertical"
-                      style={{ width: '100%', alignItems: 'center', flexGrow: 1 }}
-                      size="large"
-                    >
-                      {/* Icon */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'center',
-                          padding: '16px',
-                          borderRadius: 8,
-                          background: `${role.color}10`,
-                        }}
-                      >
-                        {role.icon}
-                      </div>
+            <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
+              <Form.Item
+                label="Email hoặc Username"
+                name="identifier"
+                rules={[{ required: true, message: 'Vui lòng nhập email hoặc username' }]}
+              >
+                <Input
+                  prefix={<UserOutlined />}
+                  placeholder="vd: admin@company.com hoặc admin"
+                  autoComplete="username"
+                />
+              </Form.Item>
 
-                      {/* Title */}
-                      <Title level={4} style={{ margin: 0, textAlign: 'center', color: role.color }}>
-                        {role.title}
-                      </Title>
+              <Form.Item
+                label="Mật khẩu"
+                name="password"
+                rules={[{ required: true, message: 'Vui lòng nhập mật khẩu' }]}
+              >
+                <Input.Password
+                  prefix={<LockOutlined />}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+              </Form.Item>
 
-                      {/* Description */}
-                      <Text type="secondary" style={{ textAlign: 'center', fontSize: 13 }}>
-                        {role.description}
-                      </Text>
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  icon={<LoginOutlined />}
+                  block
+                  size="large"
+                  loading={loading}
+                >
+                  Đăng nhập
+                </Button>
+              </Form.Item>
+            </Form>
 
-                      {/* Button */}
-                      <Button
-                        type="primary"
-                        size="large"
-                        block
-                        style={{
-                          background: role.color,
-                          borderColor: role.color,
-                          marginTop: 'auto',
-                        }}
-                        onClick={() => handleLogin(role.key)}
-                      >
-                        Đăng nhập
-                      </Button>
-                    </Space>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-
-            {/* Footer Info */}
-            <Divider style={{ margin: '32px 0' }} />
-            <div style={{ textAlign: 'center' }}>
+            <Divider style={{ margin: '16px 0' }} />
+            <Space direction="vertical" style={{ width: '100%', textAlign: 'center' }} size={2}>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                Hệ thống Quản lý KPI © 2026 | Được phát triển bởi Giang Tuấn Huy - 0869975003
+                Vai trò hỗ trợ: Quản lý cấp cao, Quản lý phòng ban, Nhân viên
               </Text>
-            </div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Hệ thống Quản lý KPI © 2026 | Liên hệ hỗ trợ: 0869975003
+              </Text>
+            </Space>
           </Card>
         </div>
       </Content>

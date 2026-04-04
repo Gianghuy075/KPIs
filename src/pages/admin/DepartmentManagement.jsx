@@ -1,23 +1,36 @@
-import React, { useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Card, message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from 'react';
+import { Table, Button, Space, Modal, Form, Input, Card, message, Divider } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { departmentService } from '../../services/departmentService';
+import { formatLog } from '../../utils/logFormatter';
 
 const DepartmentManagement = () => {
-  const [departments, setDepartments] = useState([
-    { id: 1, name: 'Ban Lãnh đạo', manager: 'Nguyễn Văn A', employees: 5 },
-    { id: 2, name: 'Kinh doanh', manager: 'Trần Thị B', employees: 12 },
-    { id: 3, name: 'Kỹ thuật', manager: 'Lê Văn C', employees: 18 },
-    { id: 4, name: 'Nhân sự', manager: 'Phạm Thị D', employees: 8 },
-  ]);
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
   const [form] = Form.useForm();
 
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const data = await departmentService.getDepartments();
+      setDepartments(data);
+    } catch (err) {
+      console.error(formatLog('Load departments failed', err.message));
+      message.error('Tải phòng ban thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const columns = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: 'Tên phòng ban', dataIndex: 'name', key: 'name' },
-    { title: 'Quản lý', dataIndex: 'manager', key: 'manager' },
-    { title: 'Số nhân viên', dataIndex: 'employees', key: 'employees' },
+    { title: 'Mô tả', dataIndex: 'description', key: 'description', render: (t) => t || '—' },
     {
       title: 'Hành động',
       key: 'action',
@@ -33,7 +46,7 @@ const DepartmentManagement = () => {
 
   const handleEdit = (dept) => {
     setEditingDept(dept);
-    form.setFieldsValue(dept);
+    form.setFieldsValue({ name: dept.name, description: dept.description });
     setModalOpen(true);
   };
 
@@ -42,36 +55,50 @@ const DepartmentManagement = () => {
       title: 'Xác nhận xóa',
       content: 'Bạn có chắc chắn muốn xóa phòng ban này?',
       onOk() {
-        setDepartments(departments.filter(d => d.id !== id));
-        message.success('Xóa phòng ban thành công');
+        departmentService
+          .deleteDepartment(id)
+          .then(() => {
+            setDepartments(departments.filter((d) => d._id !== id && d.id !== id));
+            message.success('Xóa phòng ban thành công');
+          })
+          .catch(() => message.error('Xóa phòng ban thất bại'));
       },
     });
   };
 
-  const handleSubmit = (values) => {
-    if (editingDept) {
-      setDepartments(departments.map(d => d.id === editingDept.id ? { ...d, ...values } : d));
-      message.success('Cập nhật phòng ban thành công');
-    } else {
-      setDepartments([...departments, { id: Date.now(), ...values }]);
-      message.success('Thêm phòng ban thành công');
+  const handleSubmit = async (values) => {
+    try {
+      if (editingDept) {
+        const updated = await departmentService.updateDepartment(editingDept._id || editingDept.id, values);
+        setDepartments(departments.map((d) => (d._id === updated._id ? updated : d)));
+        message.success('Cập nhật phòng ban thành công');
+      } else {
+        const created = await departmentService.createDepartment(values);
+        setDepartments([...departments, created]);
+        message.success('Thêm phòng ban thành công');
+      }
+      setModalOpen(false);
+      form.resetFields();
+      setEditingDept(null);
+    } catch (err) {
+      message.error(err.message || 'Lưu phòng ban thất bại');
     }
-    setModalOpen(false);
-    form.resetFields();
-    setEditingDept(null);
   };
 
   return (
     <Card title="Quản lý Phòng ban" extra={
-      <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+      <Space>
+        <Button icon={<ReloadOutlined />} onClick={loadData} />
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => {
         setEditingDept(null);
         form.resetFields();
         setModalOpen(true);
       }}>
-        Thêm phòng ban
-      </Button>
+          Thêm phòng ban
+        </Button>
+      </Space>
     }>
-      <Table columns={columns} dataSource={departments} rowKey="id" />
+      <Table columns={columns} dataSource={departments} rowKey={(r) => r._id || r.id} loading={loading} />
       <Modal
         title={editingDept ? 'Chỉnh sửa phòng ban' : 'Thêm phòng ban'}
         open={modalOpen}
@@ -85,11 +112,8 @@ const DepartmentManagement = () => {
           <Form.Item name="name" label="Tên phòng ban" rules={[{ required: true }]}>
             <Input placeholder="Nhập tên phòng ban" />
           </Form.Item>
-          <Form.Item name="manager" label="Quản lý" rules={[{ required: true }]}>
-            <Input placeholder="Nhập tên quản lý" />
-          </Form.Item>
-          <Form.Item name="employees" label="Số nhân viên" rules={[{ required: true, type: 'number' }]}>
-            <Input type="number" placeholder="Nhập số nhân viên" />
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea placeholder="Mô tả ngắn" rows={3} />
           </Form.Item>
         </Form>
       </Modal>

@@ -55,8 +55,8 @@ const MainLayout = ({ children }) => {
       },
     ];
 
-    // Thêm menu items cho Executive
-    if (user?.role === 'executive') {
+    // Thêm menu items cho Quản lý cấp cao
+    if (user?.role === 'senior_manager') {
       baseItems.push(
         {
           key: '/admin/kpi-dashboards',

@@ -6,7 +6,7 @@ let notificationsData = [
     content: 'Vui lòng cập nhật OKR cho phòng ban theo phiếu đính kèm. Hạn chót là 15/04/2026.',
     createdBy: 'CEO',
     createdAt: '2026-04-01T10:00:00Z',
-    recipients: ['manager', 'employee'], // 'manager', 'employee', hoặc cả hai
+    recipients: ['department_manager', 'employee'], // 'department_manager', 'employee', hoặc cả hai
     status: 'active',
   },
 ];
@@ -20,11 +20,11 @@ export const notificationService = {
       setTimeout(() => {
         const filtered = notificationsData.filter(notif => {
           // Thông báo cho manager
-          if (role === 'manager') return notif.recipients.includes('manager');
+          if (role === 'department_manager') return notif.recipients.includes('department_manager');
           // Thông báo cho employee
           if (role === 'employee') return notif.recipients.includes('employee');
           // Executive xem được tất cả
-          if (role === 'executive') return true;
+          if (role === 'senior_manager') return true;
           return false;
         });
         resolve(filtered);
@@ -41,7 +41,7 @@ export const notificationService = {
     });
   },
 
-  // Tạo thông báo mới (chỉ cho executive)
+  // Tạo thông báo mới (chỉ cho senior manager)
   createNotification: async (notificationData) => {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -87,11 +87,12 @@ export const notificationService = {
     return new Promise((resolve) => {
       setTimeout(() => {
         const filtered = notificationsData.filter(notif => {
-          const isForRole = role === 'manager' 
-            ? notif.recipients.includes('manager')
-            : role === 'employee'
-            ? notif.recipients.includes('employee')
-            : true;
+          const isForRole =
+            role === 'department_manager'
+              ? notif.recipients.includes('department_manager')
+              : role === 'employee'
+              ? notif.recipients.includes('employee')
+              : true;
           
           return isForRole && notif.status === 'active';
         });
