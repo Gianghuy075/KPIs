@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Dashboard from '../pages/Dashboard';
 import Login from '../pages/Login';
 import UserManagement from '../pages/admin/UserManagement';
+import BranchManagement from '../pages/admin/BranchManagement';
 import DepartmentManagement from '../pages/admin/DepartmentManagement';
 import DepartmentManagers from '../pages/admin/DepartmentManagers';
 import KPIManagement from '../pages/admin/KPIManagement';
@@ -40,6 +41,7 @@ const AppRouter = () => {
           {user?.role === 'senior_manager' && (
             <>
               <Route path="/admin/employee" element={<UserManagement />} />
+              <Route path="/admin/branches" element={<BranchManagement />} />
               <Route path="/admin/department-managers" element={<DepartmentManagers />} />
               <Route path="/admin/departments" element={<DepartmentManagement />} />
               <Route path="/admin/notifications" element={<NotificationManagement />} />

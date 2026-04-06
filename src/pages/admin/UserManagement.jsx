@@ -23,6 +23,7 @@ import dayjs from 'dayjs';
 import { roleLabels, ROLES } from '../../constants/roles';
 import { userService } from '../../services/userService';
 import { departmentService } from '../../services/departmentService';
+import { branchService } from '../../services/branchService';
 import { formatLog } from '../../utils/logFormatter';
 import { apiClient } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,6 +31,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [profiles, setProfiles] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -45,12 +47,14 @@ const UserManagement = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [userRes, deptRes, profileRes] = await Promise.all([
+      const [userRes, branchRes, deptRes, profileRes] = await Promise.all([
         userService.getUsers(),
+        branchService.getBranches(),
         departmentService.getDepartments(),
         apiClient.get('/user-profiles').then((r) => r.data).catch(() => []),
       ]);
       setUsers(userRes);
+      setBranches(branchRes);
       setDepartments(deptRes);
       setProfiles(profileRes);
     } catch (err) {
@@ -103,13 +107,23 @@ const UserManagement = () => {
   const columns = [
     { title: 'Username', dataIndex: 'username', key: 'username', width: 140 },
     { title: 'Email', dataIndex: 'email', key: 'email', width: 200 },
-    { title: 'Quản lý bởi', key: 'managedBy', render: (_, r) => managersMap[r.managedBy] || '—' },
+    { 
+      title: 'Chi nhánh', 
+      key: 'branch', 
+      render: (_, record) => {
+        const dept = departments.find(d => d._id === record.department?._id);
+        if (!dept) return '—';
+        const branch = branches.find(b => b._id === dept.branchId);
+        return branch ? branch.name : '—';
+      },
+    },
     {
       title: 'Phòng ban',
       dataIndex: ['department', 'name'],
       key: 'department',
       render: (_, record) => record?.department?.name || record.departmentName || '—',
     },
+    { title: 'Quản lý bởi', key: 'managedBy', render: (_, r) => managersMap[r.managedBy] || '—' },
     {
       title: 'Họ tên',
       key: 'fullName',
@@ -159,7 +173,10 @@ const UserManagement = () => {
   const handleEdit = (user) => {
     setEditingUser(user);
     const profile = profilesMap[user._id] || {};
+    const dept = departments.find(d => d._id === user?.department?._id);
+    const branchId = dept?.branchId;
     form.setFieldsValue({
+      branchId: branchId || undefined,
       username: user.username,
       email: user.email,
       departmentId: user?.department?._id,
@@ -325,6 +342,19 @@ const UserManagement = () => {
           )}
           <Divider />
           <Form.Item
+            name="branchId"
+            label="Chi nhánh"
+            rules={[{ required: true, message: 'Chọn chi nhánh' }]}
+          >
+            <Select
+              allowClear
+              placeholder="Chọn chi nhánh"
+              options={branches.map(b => ({ label: b.name, value: b._id }))}
+              showSearch
+              optionFilterProp="label"
+            />
+          </Form.Item>
+          <Form.Item
             name="departmentId"
             label="Phòng ban"
             rules={[{ required: true, message: 'Chọn phòng ban' }]}
@@ -332,7 +362,12 @@ const UserManagement = () => {
             <Select
               allowClear
               placeholder="Chọn phòng ban sẵn có"
-              options={departments.map(d => ({ label: d.name, value: d._id }))}
+              options={departments
+                .filter(d => {
+                  const branchId = form.getFieldValue('branchId');
+                  return !branchId || d.branchId === branchId;
+                })
+                .map(d => ({ label: d.name, value: d._id }))}
               showSearch
               optionFilterProp="label"
             />

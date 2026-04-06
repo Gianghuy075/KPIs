@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Card, message, Divider } from 'antd';
+import { Table, Button, Space, Modal, Form, Input, Card, message, Select } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import { departmentService } from '../../services/departmentService';
+import { branchService } from '../../services/branchService';
 import { formatLog } from '../../utils/logFormatter';
 
 const DepartmentManagement = () => {
   const [departments, setDepartments] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
@@ -14,11 +16,15 @@ const DepartmentManagement = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await departmentService.getDepartments();
-      setDepartments(data);
+      const [deptData, branchData] = await Promise.all([
+        departmentService.getDepartments(),
+        branchService.getBranches(),
+      ]);
+      setDepartments(deptData);
+      setBranches(branchData);
     } catch (err) {
-      console.error(formatLog('Load departments failed', err.message));
-      message.error('Tải phòng ban thất bại');
+      console.error(formatLog('Load data failed', err.message));
+      message.error('Tải dữ liệu thất bại');
     } finally {
       setLoading(false);
     }
@@ -29,6 +35,15 @@ const DepartmentManagement = () => {
   }, []);
 
   const columns = [
+    { 
+      title: 'Chi nhánh', 
+      dataIndex: 'branchId', 
+      key: 'branchId',
+      render: (branchId) => {
+        const branch = branches.find(b => (b._id === branchId || b.id === branchId));
+        return branch ? branch.name : '—';
+      },
+    },
     { title: 'Tên phòng ban', dataIndex: 'name', key: 'name' },
     { title: 'Mô tả', dataIndex: 'description', key: 'description', render: (t) => t || '—' },
     {
@@ -46,7 +61,11 @@ const DepartmentManagement = () => {
 
   const handleEdit = (dept) => {
     setEditingDept(dept);
-    form.setFieldsValue({ name: dept.name, description: dept.description });
+    form.setFieldsValue({ 
+      branchId: dept.branchId,
+      name: dept.name, 
+      description: dept.description 
+    });
     setModalOpen(true);
   };
 
@@ -109,6 +128,19 @@ const DepartmentManagement = () => {
         onOk={() => form.submit()}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item 
+            name="branchId" 
+            label="Chi nhánh" 
+            rules={[{ required: true, message: 'Vui lòng chọn chi nhánh' }]}
+          >
+            <Select 
+              placeholder="Chọn chi nhánh"
+              options={branches.map(b => ({
+                label: b.name,
+                value: b._id || b.id,
+              }))}
+            />
+          </Form.Item>
           <Form.Item name="name" label="Tên phòng ban" rules={[{ required: true }]}>
             <Input placeholder="Nhập tên phòng ban" />
           </Form.Item>

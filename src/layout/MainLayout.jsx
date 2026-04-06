@@ -24,6 +24,7 @@ const { Title } = Typography;
 const breadcrumbMap = {
   '/dashboard': 'Dashboard KPI',
   '/admin/users': 'Quản lý Người dùng',
+  '/admin/branches': 'Quản lý Chi nhánh',
   '/admin/departments': 'Quản lý Phòng ban',
   '/admin/kpi-management': 'Quản lý KPI Phòng ban',
   '/admin/kpi-dashboards': 'Quản lý KPIs',
@@ -132,6 +133,11 @@ const MainLayout = ({ children }) => {
           icon: <TeamOutlined />,
           label: 'Quản lý Nhân sự',
           children: [
+            {
+              key: '/admin/branches',
+              icon: <TeamOutlined />,
+              label: 'Quản lý Chi nhánh',
+            },
             {
               key: '/admin/employee',
               icon: <UserOutlined />,
