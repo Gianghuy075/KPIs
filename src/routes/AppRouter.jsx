@@ -11,6 +11,9 @@ import BranchManagement from '../pages/admin/BranchManagement';
 import KPIManagement from '../pages/admin/KPIManagement';
 import KPIDashboards from '../pages/admin/KPIDashboards';
 import DepartmentKPIDashboard from '../pages/admin/DepartmentKPIDashboard';
+import CompanyKPI from '../pages/admin/CompanyKPI';
+import BranchKPI from '../pages/branch/BranchKPI';
+import MyKPI from '../pages/employee/MyKPI';
 import NotificationManagement from '../pages/admin/NotificationManagement';
 import MonthlyWorkManagement from '../pages/admin/MonthlyWorkManagement';
 import QuarterlyWorkManagement from '../pages/admin/QuarterlyWorkManagement';
@@ -23,7 +26,11 @@ import MonthlyEvaluation from '../pages/admin/MonthlyEvaluation';
 import YearlyEvaluation from '../pages/admin/YearlyEvaluation';
 
 const AppRouter = () => {
-  const { user } = useAuth();
+  const { user, initialized } = useAuth();
+
+  if (!initialized) {
+    return null;
+  }
 
   return (
     <Routes>
@@ -35,12 +42,14 @@ const AppRouter = () => {
         </>
       ) : (
         <>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* Giữ nguyên location đang đứng; chỉ redirect khi truy cập gốc */} 
+          <Route path="/" element={<Navigate to={location.pathname === '/' ? '/dashboard' : location.pathname} replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           
           {/* Admin Routes - chỉ cho Executive */}
           {user?.role === 'senior_manager' && (
             <>
+              <Route path="/admin/kpis-bsc" element={<CompanyKPI />} />
               <Route path="/admin/employee" element={<UserManagement />} />
               <Route path="/admin/branches" element={<BranchManagement />} />
               {/* Phòng ban & trưởng phân xưởng đang tạm ẩn */}
@@ -59,6 +68,12 @@ const AppRouter = () => {
               <Route path="/admin/monthly-evaluation" element={<MonthlyEvaluation />} />
               <Route path="/admin/yearly-evaluation" element={<YearlyEvaluation />} />
             </>
+          )}
+          {user?.role === 'branch_manager' && (
+            <Route path="/branch/kpis" element={<BranchKPI />} />
+          )}
+          {user?.role === 'employee' && (
+            <Route path="/me/kpis" element={<MyKPI />} />
           )}
           
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

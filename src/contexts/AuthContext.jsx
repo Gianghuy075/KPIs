@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [refreshToken, setRefreshToken] = useState(null);
+  const [initialized, setInitialized] = useState(false);
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -18,6 +19,7 @@ export const AuthProvider = ({ children }) => {
     if (savedUser) setUser(JSON.parse(savedUser));
     if (savedToken) setToken(savedToken);
     if (savedRefresh) setRefreshToken(savedRefresh);
+    setInitialized(true);
   }, []);
 
   useEffect(() => {
@@ -78,7 +80,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, refreshToken, login, logout }}>
+    <AuthContext.Provider value={{ user, token, refreshToken, login, logout, initialized }}>
       {children}
     </AuthContext.Provider>
   );

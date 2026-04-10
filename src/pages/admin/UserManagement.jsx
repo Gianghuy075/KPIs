@@ -108,7 +108,6 @@ const UserManagement = () => {
       key: 'branch',
       render: (_, record) => record?.branch?.name || branches.find(b => b._id === record.branch)?.name || '—',
     },
-    { title: 'Quản lý bởi', key: 'managedBy', render: (_, r) => managersMap[r.managedBy] || '—' },
     {
       title: 'Họ tên',
       key: 'fullName',
@@ -162,7 +161,7 @@ const UserManagement = () => {
       branchId: user?.branch?._id || user?.branch,
       username: user.username,
       email: user.email,
-      managedBy: user?.managedBy || null,
+      // managedBy: server handled
       fullName: profile.fullName,
       title: profile.title,
       phone: profile.phone,
@@ -210,7 +209,7 @@ const UserManagement = () => {
       role: ROLES.EMPLOYEE,
       password: values.password || undefined,
       branchId: values.branchId,
-      managedBy: values.managedBy || undefined,
+      managedBy: undefined, // server tự gán (admin hoặc branch_manager)
     };
 
     try {
@@ -336,18 +335,7 @@ const UserManagement = () => {
             />
           </Form.Item>
 
-          <Form.Item
-            name="managedBy"
-            label="Quản lý bởi (Phân xưởng)"
-            rules={[{ required: true, message: 'Chọn người quản lý' }]}
-          >
-            <Select
-              placeholder="Chọn quản lý phân xưởng"
-              options={managerOptions}
-              showSearch
-              optionFilterProp="label"
-            />
-          </Form.Item>
+          {/* Quản lý bởi: tự set server (admin/branch_manager) nên không cần chọn */}
 
           <Divider>Thông tin hồ sơ</Divider>
           <Form.Item name="fullName" label="Họ tên đầy đủ">

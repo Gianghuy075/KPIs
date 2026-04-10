@@ -11,6 +11,9 @@ const BranchManagement = () => {
   const [editingBranch, setEditingBranch] = useState(null);
   const [form] = Form.useForm();
 
+  const generateBranchCode = () =>
+    `BR${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -74,7 +77,6 @@ const BranchManagement = () => {
   const handleEdit = (branch) => {
     setEditingBranch(branch);
     form.setFieldsValue({
-      code: branch.code,
       name: branch.name,
       address: branch.address,
       description: branch.description,
@@ -100,12 +102,16 @@ const BranchManagement = () => {
 
   const handleSubmit = async (values) => {
     try {
+      const payload = editingBranch
+        ? values
+        : { ...values, code: generateBranchCode() };
+
       if (editingBranch) {
-        const updated = await branchService.updateBranch(editingBranch._id || editingBranch.id, values);
+        const updated = await branchService.updateBranch(editingBranch._id || editingBranch.id, payload);
         setBranches(branches.map((b) => (b._id === updated._id ? updated : b)));
         message.success('Cập nhật chi nhánh thành công');
       } else {
-        const created = await branchService.createBranch(values);
+        const created = await branchService.createBranch(payload);
         setBranches([...branches, created]);
         message.success('Thêm chi nhánh thành công');
       }
@@ -154,13 +160,6 @@ const BranchManagement = () => {
         onOk={() => form.submit()}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item
-            name="code"
-            label="Mã chi nhánh"
-            rules={[{ required: true, message: 'Vui lòng nhập mã chi nhánh' }]}
-          >
-            <Input placeholder="VD: BR001, BR002" />
-          </Form.Item>
           <Form.Item
             name="name"
             label="Tên chi nhánh"

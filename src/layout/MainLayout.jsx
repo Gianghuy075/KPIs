@@ -38,6 +38,9 @@ const breadcrumbMap = {
   '/admin/daily-evaluation': 'Quản lý Đánh giá Hàng ngày',
   '/admin/monthly-evaluation': 'Quản lý Đánh giá Hàng tháng',
   '/admin/yearly-evaluation': 'Quản lý Đánh giá Hàng năm',
+  '/admin/kpis-bsc': 'KPI BSC (Công ty)',
+  '/branch/kpis': 'KPI Phân xưởng',
+  '/me/kpis': 'KPI của tôi',
 };
 
 const MainLayout = ({ children }) => {
@@ -69,6 +72,11 @@ const MainLayout = ({ children }) => {
           icon: <SettingOutlined />,
           label: 'Quản lý Hệ thống',
           children: [
+            {
+              key: '/admin/kpis-bsc',
+              icon: <BarChartOutlined />,
+              label: 'KPI BSC (Công ty)',
+            },
             {
               key: '/admin/notifications',
               icon: <CheckOutlined />,
@@ -146,6 +154,22 @@ const MainLayout = ({ children }) => {
           ],
         },
       );
+    }
+
+    if (user?.role === 'branch_manager') {
+      baseItems.push({
+        key: '/branch/kpis',
+        icon: <BarChartOutlined />,
+        label: 'KPI Phân xưởng',
+      });
+    }
+
+    if (user?.role === 'employee') {
+      baseItems.push({
+        key: '/me/kpis',
+        icon: <BarChartOutlined />,
+        label: 'KPI của tôi',
+      });
     }
 
     // Thêm các menu items chung khác
