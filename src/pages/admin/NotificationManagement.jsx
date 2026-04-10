@@ -91,20 +91,20 @@ const NotificationManagement = () => {
   };
 
   const getRecipientLabel = (recipients) => {
-    if (recipients.includes('manager') && recipients.includes('employee')) {
+    if (recipients.includes('branch_manager') && recipients.includes('employee')) {
       return 'Quản lý + Nhân viên';
     }
-    if (recipients.includes('manager')) {
-      return 'Quản lý';
+    if (recipients.includes('branch_manager')) {
+      return 'Quản lý Phân xưởng';
     }
     return 'Nhân viên';
   };
 
   const getRecipientColor = (recipients) => {
-    if (recipients.includes('manager') && recipients.includes('employee')) {
+    if (recipients.includes('branch_manager') && recipients.includes('employee')) {
       return 'blue';
     }
-    if (recipients.includes('manager')) {
+    if (recipients.includes('branch_manager')) {
       return 'green';
     }
     return 'orange';
@@ -270,7 +270,7 @@ const NotificationManagement = () => {
               mode="multiple"
               placeholder="Chọn đối tượng"
             >
-              <Option value="manager">Quản lý Phòng ban</Option>
+              <Option value="branch_manager">Quản lý Phân xưởng</Option>
               <Option value="employee">Nhân viên</Option>
             </Select>
           </Form.Item>

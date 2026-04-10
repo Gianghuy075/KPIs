@@ -6,7 +6,7 @@ let notificationsData = [
     content: 'Vui lòng cập nhật OKR cho phòng ban theo phiếu đính kèm. Hạn chót là 15/04/2026.',
     createdBy: 'CEO',
     createdAt: '2026-04-01T10:00:00Z',
-    recipients: ['department_manager', 'employee'], // 'department_manager', 'employee', hoặc cả hai
+    recipients: ['branch_manager', 'employee'], // 'branch_manager', 'employee', hoặc cả hai
     status: 'active',
   },
 ];
@@ -20,7 +20,7 @@ export const notificationService = {
       setTimeout(() => {
         const filtered = notificationsData.filter(notif => {
           // Thông báo cho manager
-          if (role === 'department_manager') return notif.recipients.includes('department_manager');
+          if (role === 'branch_manager') return notif.recipients.includes('branch_manager');
           // Thông báo cho employee
           if (role === 'employee') return notif.recipients.includes('employee');
           // Executive xem được tất cả
@@ -88,11 +88,11 @@ export const notificationService = {
       setTimeout(() => {
         const filtered = notificationsData.filter(notif => {
           const isForRole =
-            role === 'department_manager'
-              ? notif.recipients.includes('department_manager')
+            role === 'branch_manager'
+              ? notif.recipients.includes('branch_manager')
               : role === 'employee'
-              ? notif.recipients.includes('employee')
-              : true;
+                ? notif.recipients.includes('employee')
+                : true;
           
           return isForRole && notif.status === 'active';
         });

@@ -25,7 +25,7 @@ const breadcrumbMap = {
   '/dashboard': 'Dashboard KPI',
   '/admin/users': 'Quản lý Người dùng',
   '/admin/branches': 'Quản lý Chi nhánh',
-  '/admin/departments': 'Quản lý Phòng ban',
+  // Phòng ban đã ẩn
   '/admin/kpi-management': 'Quản lý KPI Phòng ban',
   '/admin/kpi-dashboards': 'Quản lý KPIs',
   '/admin/notifications': 'Quản lý Thông báo',
@@ -136,22 +136,12 @@ const MainLayout = ({ children }) => {
             {
               key: '/admin/branches',
               icon: <TeamOutlined />,
-              label: 'Quản lý Chi nhánh',
+              label: 'Quản lý Phân xưởng',
             },
             {
               key: '/admin/employee',
               icon: <UserOutlined />,
               label: 'Quản lý Nhân viên',
-            },
-            {
-              key: '/admin/department-managers',
-              icon: <TeamOutlined />,
-              label: 'Quản lý Trưởng phòng',
-            },
-            {
-              key: '/admin/departments',
-              icon: <TeamOutlined />,
-              label: 'Quản lý Phòng ban',
             },
           ],
         },

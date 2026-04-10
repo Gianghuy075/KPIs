@@ -10,7 +10,7 @@ const { Content } = Layout;
 
 const redirectByRole = {
   senior_manager: '/dashboard',
-  department_manager: '/dashboard',
+  branch_manager: '/dashboard',
   employee: '/dashboard',
 };
 

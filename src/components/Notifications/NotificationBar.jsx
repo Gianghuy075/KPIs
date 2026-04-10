@@ -18,20 +18,20 @@ const NotificationBar = () => {
   }
 
   const getRecipientLabel = (recipients) => {
-    if (recipients.includes('manager') && recipients.includes('employee')) {
+    if (recipients.includes('branch_manager') && recipients.includes('employee')) {
       return 'Cho tất cả';
     }
-    if (recipients.includes('manager')) {
-      return 'Cho Quản lý';
+    if (recipients.includes('branch_manager')) {
+      return 'Cho Quản lý phân xưởng';
     }
     return 'Cho Nhân viên';
   };
 
   const getRecipientColor = (recipients) => {
-    if (recipients.includes('manager') && recipients.includes('employee')) {
+    if (recipients.includes('branch_manager') && recipients.includes('employee')) {
       return 'blue';
     }
-    if (recipients.includes('manager')) {
+    if (recipients.includes('branch_manager')) {
       return 'green';
     }
     return 'orange';

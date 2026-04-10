@@ -8,9 +8,7 @@ import {
   Input,
   Card,
   message,
-  Select,
   Divider,
-  DatePicker,
 } from 'antd';
 import {
   PlusOutlined,
@@ -18,10 +16,8 @@ import {
   DeleteOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
 import { roleLabels, ROLES } from '../../constants/roles';
 import { userService } from '../../services/userService';
-import { departmentService } from '../../services/departmentService';
 import { apiClient } from '../../services/apiClient';
 import { formatLog } from '../../utils/logFormatter';
 
@@ -29,7 +25,6 @@ const DepartmentManagers = () => {
   const [allUsers, setAllUsers] = useState([]);
   const [users, setUsers] = useState([]);
   const [profiles, setProfiles] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -38,14 +33,12 @@ const DepartmentManagers = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [userRes, deptRes, profileRes] = await Promise.all([
+      const [userRes, profileRes] = await Promise.all([
         userService.getUsers(),
-        departmentService.getDepartments(),
         apiClient.get('/user-profiles').then((r) => r.data).catch(() => []),
       ]);
       setAllUsers(userRes);
-      setUsers(userRes.filter((u) => u.role === ROLES.DEPARTMENT_MANAGER));
-      setDepartments(deptRes);
+      setUsers(userRes.filter((u) => u.role === ROLES.BRANCH_MANAGER));
       setProfiles(profileRes);
     } catch (err) {
       console.error(formatLog('Load managers failed', err.message));
@@ -84,7 +77,6 @@ const DepartmentManagers = () => {
   const columns = [
     { title: 'Username', dataIndex: 'username', key: 'username', width: 140 },
     { title: 'Email', dataIndex: 'email', key: 'email', width: 200 },
-    { title: 'Phòng ban', dataIndex: ['department', 'name'], key: 'department', render:(_, r)=> r?.department?.name || '—' },
     { title: 'Họ tên', key: 'fullName', render:(_,r)=> profilesMap[r._id]?.fullName || '—' },
     { title: 'Điện thoại', key: 'phone', render:(_,r)=> profilesMap[r._id]?.phone || '—' },
     {
@@ -116,8 +108,6 @@ const DepartmentManagers = () => {
     form.setFieldsValue({
       username: user.username,
       email: user.email,
-      departmentId: user?.department?._id,
-      departmentName: '',
       fullName: profile.fullName,
       title: profile.title,
       phone: profile.phone,
@@ -135,7 +125,7 @@ const DepartmentManagers = () => {
     const id = record._id || record.id;
     Modal.confirm({
       title: 'Xác nhận xóa',
-      content: 'Bạn có chắc chắn muốn xóa quản lý phòng ban này?',
+      content: 'Bạn có chắc chắn muốn xóa quản lý phân xưởng này?',
       onOk() {
         userService
           .deleteUser(id)
@@ -157,10 +147,8 @@ const DepartmentManagers = () => {
     const payload = {
       username: values.username,
       email: values.email,
-      role: ROLES.DEPARTMENT_MANAGER,
+      role: ROLES.BRANCH_MANAGER,
       password: values.password || undefined,
-      departmentId: values.departmentId,
-      departmentName: undefined,
       managedBy: undefined, // set server side to current admin
     };
 
@@ -178,35 +166,7 @@ const DepartmentManagers = () => {
         setUsers([...users, userResult]);
       }
 
-      const profilePayload = {
-        user: userResult._id,
-        fullName: values.fullName || userResult.username,
-        title: values.title,
-        phone: values.phone,
-        address: values.address,
-        gender: values.gender,
-        status: values.status,
-        avatarUrl: values.avatarUrl,
-        dateOfBirth: values.dateOfBirth ? values.dateOfBirth.toISOString() : undefined,
-        startDate: values.startDate ? values.startDate.toISOString() : undefined,
-      };
-
-      const existingProfile = profilesMap[userResult._id];
-      if (existingProfile?._id) {
-        const updatedProfile = await apiClient
-          .patch(`/user-profiles/${existingProfile._id}`, profilePayload)
-          .then((r) => r.data);
-        setProfiles(
-          profiles.map((p) => (p._id === updatedProfile._id ? updatedProfile : p)),
-        );
-      } else {
-        const createdProfile = await apiClient
-          .post('/user-profiles', profilePayload)
-          .then((r) => r.data);
-        setProfiles([...profiles, createdProfile]);
-      }
-
-      message.success(editingUser ? 'Cập nhật thành công' : 'Thêm quản lý phòng ban thành công');
+      message.success(editingUser ? 'Cập nhật thành công' : 'Thêm quản lý phân xưởng thành công');
       setModalOpen(false);
       form.resetFields();
       setEditingUser(null);
@@ -218,7 +178,7 @@ const DepartmentManagers = () => {
 
   return (
     <Card
-      title="Quản lý Trưởng phòng"
+      title="Quản lý Trưởng phân xưởng"
       extra={
         <Space>
           <Button icon={<ReloadOutlined />} onClick={loadData} />
@@ -231,7 +191,7 @@ const DepartmentManagers = () => {
               setModalOpen(true);
             }}
           >
-            Thêm trưởng phòng
+            Thêm trưởng phân xưởng
           </Button>
         </Space>
       }
@@ -244,7 +204,7 @@ const DepartmentManagers = () => {
       />
 
       <Modal
-        title={editingUser ? 'Chỉnh sửa trưởng phòng' : 'Thêm trưởng phòng'}
+        title={editingUser ? 'Chỉnh sửa trưởng phân xưởng' : 'Thêm trưởng phân xưởng'}
         open={modalOpen}
         onCancel={() => {
           setModalOpen(false);
@@ -270,67 +230,7 @@ const DepartmentManagers = () => {
               <Input.Password placeholder="Để trống nếu không đổi" />
             </Form.Item>
           )}
-          <Divider />
-          <Form.Item
-            name="departmentId"
-            label="Phòng ban"
-            rules={[{ required: true, message: 'Chọn phòng ban' }]}
-          >
-            <Select
-              allowClear
-              placeholder="Chọn phòng ban sẵn có"
-              options={departments.map((d) => ({ label: d.name, value: d._id }))}
-              showSearch
-              optionFilterProp="label"
-            />
-          </Form.Item>
-
-          <Divider>Thông tin hồ sơ</Divider>
-          <Form.Item name="fullName" label="Họ tên đầy đủ">
-            <Input placeholder="VD: Nguyễn Văn A" />
-          </Form.Item>
-          <Form.Item name="title" label="Chức danh">
-            <Input placeholder="VD: Trưởng phòng" />
-          </Form.Item>
-          <Form.Item name="phone" label="Điện thoại">
-            <Input placeholder="VD: 0901234567" />
-          </Form.Item>
-          <Form.Item name="address" label="Địa chỉ">
-            <Input placeholder="Nhập địa chỉ" />
-          </Form.Item>
-          <Form.Item name="avatarUrl" label="Ảnh đại diện (URL)">
-            <Input placeholder="https://..." />
-          </Form.Item>
-          <Space size="large" style={{ display: 'flex' }}>
-            <Form.Item name="gender" label="Giới tính" style={{ flex: 1 }}>
-              <Select
-                allowClear
-                options={[
-                  { value: 'male', label: 'Nam' },
-                  { value: 'female', label: 'Nữ' },
-                  { value: 'other', label: 'Khác' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item name="status" label="Trạng thái" style={{ flex: 1 }}>
-              <Select
-                allowClear
-                options={[
-                  { value: 'active', label: 'Đang làm' },
-                  { value: 'on_leave', label: 'Nghỉ phép' },
-                  { value: 'inactive', label: 'Nghỉ' },
-                ]}
-              />
-            </Form.Item>
-          </Space>
-          <Space size="large" style={{ display: 'flex' }}>
-            <Form.Item name="dateOfBirth" label="Ngày sinh" style={{ flex: 1 }}>
-              <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item name="startDate" label="Ngày vào làm" style={{ flex: 1 }}>
-              <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
-            </Form.Item>
-          </Space>
+          {/* Không cần phòng ban cho tài khoản Phân xưởng */}
         </Form>
       </Modal>
     </Card>

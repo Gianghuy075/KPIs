@@ -22,7 +22,6 @@ import {
 import dayjs from 'dayjs';
 import { roleLabels, ROLES } from '../../constants/roles';
 import { userService } from '../../services/userService';
-import { departmentService } from '../../services/departmentService';
 import { branchService } from '../../services/branchService';
 import { formatLog } from '../../utils/logFormatter';
 import { apiClient } from '../../services/apiClient';
@@ -32,7 +31,6 @@ const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [branches, setBranches] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -47,18 +45,16 @@ const UserManagement = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [userRes, branchRes, deptRes, profileRes] = await Promise.all([
+      const [userRes, branchRes, profileRes] = await Promise.all([
         userService.getUsers(),
         branchService.getBranches(),
-        departmentService.getDepartments(),
         apiClient.get('/user-profiles').then((r) => r.data).catch(() => []),
       ]);
       setUsers(userRes);
       setBranches(branchRes);
-      setDepartments(deptRes);
       setProfiles(profileRes);
     } catch (err) {
-      console.error(formatLog('Load users/departments failed', err.message));
+      console.error(formatLog('Load users failed', err.message));
       message.error('Tải dữ liệu thất bại');
     } finally {
       setLoading(false);
@@ -89,7 +85,7 @@ const UserManagement = () => {
   const managerOptions = useMemo(
     () =>
       users
-        .filter((u) => u.role === ROLES.DEPARTMENT_MANAGER)
+        .filter((u) => u.role === ROLES.BRANCH_MANAGER)
         .map((u) => ({ value: u._id, label: `${u.username} (${u.email})` })),
     [users],
   );
@@ -97,7 +93,7 @@ const UserManagement = () => {
   const managersMap = useMemo(() => {
     const map = {};
     users
-      .filter((u) => u.role === ROLES.DEPARTMENT_MANAGER)
+      .filter((u) => u.role === ROLES.BRANCH_MANAGER)
       .forEach((u) => {
         map[u._id] = `${u.username}`;
       });
@@ -107,21 +103,10 @@ const UserManagement = () => {
   const columns = [
     { title: 'Username', dataIndex: 'username', key: 'username', width: 140 },
     { title: 'Email', dataIndex: 'email', key: 'email', width: 200 },
-    { 
-      title: 'Chi nhánh', 
-      key: 'branch', 
-      render: (_, record) => {
-        const dept = departments.find(d => d._id === record.department?._id);
-        if (!dept) return '—';
-        const branch = branches.find(b => b._id === dept.branchId);
-        return branch ? branch.name : '—';
-      },
-    },
     {
-      title: 'Phòng ban',
-      dataIndex: ['department', 'name'],
-      key: 'department',
-      render: (_, record) => record?.department?.name || record.departmentName || '—',
+      title: 'Phân xưởng',
+      key: 'branch',
+      render: (_, record) => record?.branch?.name || branches.find(b => b._id === record.branch)?.name || '—',
     },
     { title: 'Quản lý bởi', key: 'managedBy', render: (_, r) => managersMap[r.managedBy] || '—' },
     {
@@ -173,13 +158,10 @@ const UserManagement = () => {
   const handleEdit = (user) => {
     setEditingUser(user);
     const profile = profilesMap[user._id] || {};
-    const dept = departments.find(d => d._id === user?.department?._id);
-    const branchId = dept?.branchId;
     form.setFieldsValue({
-      branchId: branchId || undefined,
+      branchId: user?.branch?._id || user?.branch,
       username: user.username,
       email: user.email,
-      departmentId: user?.department?._id,
       managedBy: user?.managedBy || null,
       fullName: profile.fullName,
       title: profile.title,
@@ -227,8 +209,7 @@ const UserManagement = () => {
       email: values.email,
       role: ROLES.EMPLOYEE,
       password: values.password || undefined,
-      departmentId: values.departmentId,
-      departmentName: undefined,
+      branchId: values.branchId,
       managedBy: values.managedBy || undefined,
     };
 
@@ -343,31 +324,13 @@ const UserManagement = () => {
           <Divider />
           <Form.Item
             name="branchId"
-            label="Chi nhánh"
-            rules={[{ required: true, message: 'Chọn chi nhánh' }]}
+            label="Phân xưởng"
+            rules={[{ required: true, message: 'Chọn phân xưởng' }]}
           >
             <Select
               allowClear
-              placeholder="Chọn chi nhánh"
+              placeholder="Chọn phân xưởng"
               options={branches.map(b => ({ label: b.name, value: b._id }))}
-              showSearch
-              optionFilterProp="label"
-            />
-          </Form.Item>
-          <Form.Item
-            name="departmentId"
-            label="Phòng ban"
-            rules={[{ required: true, message: 'Chọn phòng ban' }]}
-          >
-            <Select
-              allowClear
-              placeholder="Chọn phòng ban sẵn có"
-              options={departments
-                .filter(d => {
-                  const branchId = form.getFieldValue('branchId');
-                  return !branchId || d.branchId === branchId;
-                })
-                .map(d => ({ label: d.name, value: d._id }))}
               showSearch
               optionFilterProp="label"
             />
@@ -375,11 +338,11 @@ const UserManagement = () => {
 
           <Form.Item
             name="managedBy"
-            label="Quản lý bởi (Trưởng phòng)"
+            label="Quản lý bởi (Phân xưởng)"
             rules={[{ required: true, message: 'Chọn người quản lý' }]}
           >
             <Select
-              placeholder="Chọn trưởng phòng"
+              placeholder="Chọn quản lý phân xưởng"
               options={managerOptions}
               showSearch
               optionFilterProp="label"

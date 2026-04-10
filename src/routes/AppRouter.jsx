@@ -5,8 +5,9 @@ import Dashboard from '../pages/Dashboard';
 import Login from '../pages/Login';
 import UserManagement from '../pages/admin/UserManagement';
 import BranchManagement from '../pages/admin/BranchManagement';
-import DepartmentManagement from '../pages/admin/DepartmentManagement';
-import DepartmentManagers from '../pages/admin/DepartmentManagers';
+// Phòng ban và trưởng phòng không còn dùng, tạm thời disable
+// import DepartmentManagement from '../pages/admin/DepartmentManagement';
+// import DepartmentManagers from '../pages/admin/DepartmentManagers';
 import KPIManagement from '../pages/admin/KPIManagement';
 import KPIDashboards from '../pages/admin/KPIDashboards';
 import DepartmentKPIDashboard from '../pages/admin/DepartmentKPIDashboard';
@@ -42,8 +43,7 @@ const AppRouter = () => {
             <>
               <Route path="/admin/employee" element={<UserManagement />} />
               <Route path="/admin/branches" element={<BranchManagement />} />
-              <Route path="/admin/department-managers" element={<DepartmentManagers />} />
-              <Route path="/admin/departments" element={<DepartmentManagement />} />
+              {/* Phòng ban & trưởng phân xưởng đang tạm ẩn */}
               <Route path="/admin/notifications" element={<NotificationManagement />} />
               <Route path="/admin/kpi-management" element={<KPIManagement />} />
               <Route path="/admin/kpi-dashboards" element={<KPIDashboards />} />

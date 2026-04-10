@@ -1,13 +1,13 @@
 export const ROLES = {
   SENIOR_MANAGER: 'senior_manager',
   BRANCH_MANAGER: 'branch_manager',
-  DEPARTMENT_MANAGER: 'department_manager',
+  DEPARTMENT_MANAGER: 'department_manager', // giữ để tương thích cũ
   EMPLOYEE: 'employee',
 };
 
 export const roleLabels = {
   [ROLES.SENIOR_MANAGER]: 'Quản lý cấp cao',
-  [ROLES.BRANCH_MANAGER]: 'Quản lý chi nhánh',
+  [ROLES.BRANCH_MANAGER]: 'Quản lý phân xưởng',
   [ROLES.DEPARTMENT_MANAGER]: 'Quản lý phòng ban',
   [ROLES.EMPLOYEE]: 'Nhân viên',
 };
@@ -16,6 +16,6 @@ export const roleLabels = {
 export const legacyRoleMap = {
   executive: ROLES.SENIOR_MANAGER,
   branch_manager: ROLES.BRANCH_MANAGER,
-  manager: ROLES.DEPARTMENT_MANAGER,
+  manager: ROLES.BRANCH_MANAGER,
   employee: ROLES.EMPLOYEE,
 };
