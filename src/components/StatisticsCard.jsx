@@ -17,7 +17,7 @@ const StatisticsCard = ({
     <Card
       size="small"
       style={{ height: '100%', ...style }}
-      bodyStyle={{ padding: '16px' }}
+      styles={{ body: { padding: '16px' } }}
     >
       <Statistic
         title={title}

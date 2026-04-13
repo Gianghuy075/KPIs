@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Row,
   Col,
@@ -8,33 +8,109 @@ import {
   Typography,
   Divider,
   Alert,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  DatePicker,
+  Select,
+  App as AntApp,
 } from 'antd';
-import { PlusOutlined, ReloadOutlined, TrophyOutlined } from '@ant-design/icons';
-import { useKPIActions } from '../features/kpi-management/hooks/useKPIActions';
-import KPITable from '../features/kpi-management/components/KPITable';
-import AddKPIModal from '../features/kpi-management/components/AddKPIModal';
+import { ReloadOutlined, TrophyOutlined, PlusOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
+import { companyKpiService } from '../services/companyKpiService';
 import StatisticsCard from '../components/StatisticsCard';
 import PerspectivePieChart from '../components/Charts/PerspectivePieChart';
 import NotificationBar from '../components/Notifications/NotificationBar';
-import { getStatusColor, getStatusLabel } from '../utils/kpiUtils';
+import KPITable from '../features/kpi-management/components/KPITable';
+import { getStatus, getStatusLabel, getStatusColor, PERSPECTIVES } from '../utils/kpiUtils';
 
 const { Title, Text } = Typography;
+const categories = [
+  { value: 'business', label: 'Kinh doanh' },
+  { value: 'customer', label: 'Khách hàng' },
+  { value: 'internal', label: 'Nội bộ' },
+  { value: 'learning', label: 'Học tập & Phát triển' },
+];
 
 const Dashboard = () => {
-  const { kpis, loading, error, fetchKPIs, addKPI, updateKPI, deleteKPI } = useKPIActions();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingKPI, setEditingKPI] = useState(null);
+  const { message, modal } = AntApp.useApp();
+  const navigate = useNavigate();
+  const [rawKpis, setRawKpis] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingKpi, setEditingKpi] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [editForm] = Form.useForm();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm] = Form.useForm();
+
+  const fetchKPIs = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await companyKpiService.list();
+      setRawKpis(res || []);
+    } catch (err) {
+      setError(err?.message || 'Không tải được KPI');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchKPIs();
+  }, []);
+
+  const kpis = useMemo(() => {
+    const mapPerspective = {
+      business: PERSPECTIVES.FINANCIAL,
+      customer: PERSPECTIVES.CUSTOMER,
+      internal: PERSPECTIVES.INTERNAL,
+      learning: PERSPECTIVES.LEARNING,
+    };
+
+    return (rawKpis || []).filter(Boolean).map((kpi) => {
+      const targetValue = Number(kpi.targetValue || 0);
+      const actualValue = Number(kpi.actualValue || 0);
+      const completionRate = targetValue > 0 ? Math.min((actualValue / targetValue) * 100, 150) : 0;
+      const perspectiveLabel = mapPerspective[kpi.category] || kpi.category || 'Khác';
+      return {
+        id: kpi._id || kpi.id,
+        name: kpi.title || '—',
+        unit: kpi.unit || '',
+        weight: Number(kpi.weight || 0),
+        target: targetValue,
+        actual: actualValue,
+        completionRate,
+        status: getStatus(completionRate),
+        perspective: perspectiveLabel,
+      };
+    });
+  }, [rawKpis]);
 
   const stats = useMemo(() => {
     if (!kpis.length) return null;
 
-    const totalWeight = kpis.reduce((sum, k) => sum + k.weight, 0);
-    const weightedScore = kpis.reduce((sum, k) => sum + (k.completionRate * k.weight) / 100, 0);
-    const overallScore = totalWeight > 0 ? (weightedScore / totalWeight) * 100 : 0;
-
     const completed = kpis.filter((k) => k.status === 'completed').length;
     const warning = kpis.filter((k) => k.status === 'warning').length;
     const risk = kpis.filter((k) => k.status === 'risk').length;
+
+    const weighted = kpis.reduce(
+      (acc, k) => {
+        const weight = k.weight || 0;
+        acc.totalWeight += weight;
+        acc.weightedScore += (k.completionRate * weight) / 100;
+        return acc;
+      },
+      { weightedScore: 0, totalWeight: 0 },
+    );
+
+    const overallScore = weighted.totalWeight > 0
+      ? (weighted.weightedScore / weighted.totalWeight) * 100
+      : kpis.reduce((sum, k) => sum + k.completionRate, 0) / kpis.length;
 
     return {
       totalKPIs: kpis.length,
@@ -42,41 +118,87 @@ const Dashboard = () => {
       completed,
       warning,
       risk,
-      totalWeight,
+      totalWeight: weighted.totalWeight,
     };
   }, [kpis]);
 
-  const handleOpenAdd = () => {
-    setEditingKPI(null);
-    setModalOpen(true);
+  const overallStatus = stats ? getStatus(stats.overallScore) : null;
+
+  const categoryData = useMemo(() => {
+    const map = {};
+    kpis.forEach((k) => {
+      const perspective = k.perspective;
+      const value = k.weight || 1;
+      map[perspective] = (map[perspective] || 0) + value;
+    });
+    return Object.entries(map).map(([perspective, weight]) => ({
+      name: perspective,
+      value: weight,
+      weight,
+      perspective,
+    }));
+  }, [kpis]);
+
+  const openEdit = (record) => {
+    const kpi = rawKpis.find((k) => (k._id || k.id) === record.id);
+    if (!kpi) return;
+    setEditingKpi(kpi);
+    editForm.setFieldsValue({
+      title: kpi.title,
+      category: kpi.category,
+      targetValue: kpi.targetValue,
+      unit: kpi.unit,
+      weight: kpi.weight || 0,
+      targetDate: kpi.targetDate ? dayjs(kpi.targetDate) : null,
+      description: kpi.description,
+    });
+    setEditOpen(true);
   };
 
-  const handleEdit = (kpi) => {
-    setEditingKPI(kpi);
-    setModalOpen(true);
-  };
-
-  const handleSubmit = async (values) => {
-    let success;
-    if (editingKPI) {
-      success = await updateKPI(editingKPI.id, values);
-    } else {
-      success = await addKPI(values);
+  const handleUpdate = async () => {
+    try {
+      const values = await editForm.validateFields();
+      setSaving(true);
+      await companyKpiService.update(editingKpi._id || editingKpi.id, {
+        title: values.title,
+        category: values.category,
+        targetValue: values.targetValue,
+        unit: values.unit,
+        weight: values.weight ?? 0,
+        targetDate: values.targetDate?.toISOString(),
+        description: values.description,
+      });
+      message.success('Đã cập nhật KPI');
+      setEditOpen(false);
+      setEditingKpi(null);
+      fetchKPIs();
+    } catch (err) {
+      if (!err?.errorFields) {
+        message.error('Cập nhật thất bại');
+      }
+    } finally {
+      setSaving(false);
     }
-    if (success) {
-      setModalOpen(false);
-      setEditingKPI(null);
-    }
   };
 
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setEditingKPI(null);
+  const handleDelete = (id) => {
+    modal.confirm({
+      title: 'Xóa KPI?',
+      content: 'Bạn chắc chắn muốn xóa KPI này?',
+      okText: 'Xóa',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await companyKpiService.remove(id);
+          message.success('Đã xóa KPI');
+          fetchKPIs();
+        } catch (err) {
+          message.error('Xóa KPI thất bại');
+        }
+      },
+    });
   };
-
-  const overallStatus = stats
-    ? stats.overallScore >= 100 ? 'completed' : stats.overallScore >= 70 ? 'warning' : 'risk'
-    : null;
 
   return (
     <div>
@@ -112,8 +234,11 @@ const Dashboard = () => {
               <Button icon={<ReloadOutlined />} onClick={fetchKPIs} loading={loading}>
                 Làm mới
               </Button>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenAdd}>
-                Thêm KPI
+              <Button icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+                Tạo KPI
+              </Button>
+              <Button type="primary" onClick={() => navigate('/admin/kpis-bsc')}>
+                Quản lý KPI
               </Button>
             </Space>
           </Col>
@@ -149,22 +274,22 @@ const Dashboard = () => {
           </Col>
           <Col xs={24} sm={12} lg={6}>
             <StatisticsCard
-              title="Hoàn thành / Cảnh báo"
+              title="Hoàn thành"
               value={stats.completed}
-              suffix={`/ ${stats.warning}`}
+              suffix={`/ ${stats.totalKPIs}`}
               precision={0}
-              tag="KPI đạt mục tiêu"
-              tagColor="success"
+              tag="Đã hoàn thành"
+              tagColor={getStatusColor('completed')}
             />
           </Col>
           <Col xs={24} sm={12} lg={6}>
             <StatisticsCard
-              title="KPI Rủi ro"
-              value={stats.risk}
+              title="Cảnh báo & Rủi ro"
+              value={stats.warning + stats.risk}
               suffix="chỉ số"
               precision={0}
-              tag={stats.risk === 0 ? 'Tốt' : 'Cần chú ý'}
-              tagColor={stats.risk === 0 ? 'success' : 'error'}
+              tag={`${stats.warning} cảnh báo / ${stats.risk} rủi ro`}
+              tagColor={getStatusColor(stats.warning > stats.risk ? 'warning' : 'risk')}
             />
           </Col>
         </Row>
@@ -174,8 +299,8 @@ const Dashboard = () => {
       {kpis.length > 0 && (
         <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
           <Col xs={24} lg={12}>
-            <Card title="Phân bổ trọng số theo góc độ BSC" size="small">
-              <PerspectivePieChart kpis={kpis} />
+            <Card title="Phân bổ KPI theo góc độ" size="small">
+              <PerspectivePieChart kpis={categoryData} />
             </Card>
           </Col>
           <Col xs={24} lg={12}>
@@ -214,7 +339,7 @@ const Dashboard = () => {
       <Card
         title={
           <Space>
-            <span>Bảng KPI theo góc độ BSC</span>
+            <span>Bảng KPI BSC</span>
             {stats && (
               <Text type="secondary" style={{ fontWeight: 'normal', fontSize: 13 }}>
                 ({stats.totalKPIs} chỉ số)
@@ -222,23 +347,143 @@ const Dashboard = () => {
             )}
           </Space>
         }
-        extra={
-          <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleOpenAdd}>
-            Thêm KPI
-          </Button>
-        }
+        styles={{ body: { padding: 0 } }}
       >
-        <KPITable kpis={kpis} loading={loading} onEdit={handleEdit} onDelete={deleteKPI} />
+        <KPITable kpis={kpis} loading={loading} onEdit={openEdit} onDelete={handleDelete} />
       </Card>
 
-      <AddKPIModal
-        open={modalOpen}
-        onClose={handleCloseModal}
-        onSubmit={handleSubmit}
-        editingKPI={editingKPI}
-        loading={loading}
-        allKPIs={kpis}
-      />
+      {/* Create KPI */}
+      <Modal
+        title="Tạo KPI BSC"
+        open={createOpen}
+        onCancel={() => setCreateOpen(false)}
+        onOk={async () => {
+          try {
+            const values = await createForm.validateFields();
+            setSaving(true);
+            const payload = {
+              title: values.title,
+              category: values.category,
+              targetValue: values.targetValue,
+              unit: values.unit,
+              targetDate: values.targetDate?.toISOString(),
+              distributionStrategy: values.distributionStrategy || 'equal',
+              weight: Number(values.weight ?? 0),
+            };
+            await companyKpiService.create(payload);
+            message.success('Đã tạo KPI');
+            setCreateOpen(false);
+            createForm.resetFields();
+            fetchKPIs();
+          } catch (err) {
+            if (!err?.errorFields) message.error('Tạo KPI thất bại');
+          } finally {
+            setSaving(false);
+          }
+        }}
+        okButtonProps={{ loading: saving }}
+        destroyOnHide
+      >
+        <Form form={createForm} layout="vertical">
+          <Form.Item name="title" label="Tên KPI" rules={[{ required: true }]}>
+            <Input placeholder="VD: Doanh thu tháng 7/2026" />
+          </Form.Item>
+          <Form.Item name="category" label="Góc độ BSC" rules={[{ required: true }]}>
+            <Select options={categories} />
+          </Form.Item>
+          <Form.Item
+            name="targetValue"
+            label="Giá trị mục tiêu"
+            rules={[{ required: true, type: 'number', min: 0 }]}
+          >
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate>
+            {() => (
+          <Form.Item
+            name="weight"
+            label="Trọng số (%)"
+            rules={[
+              { required: true, message: 'Nhập trọng số' },
+              { type: 'number', min: 0, max: 100 },
+            ]}
+          >
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber style={{ width: '100%' }} />
+              <Button disabled>%</Button>
+            </Space.Compact>
+            <div style={{ color: '#999', marginTop: 4, fontSize: 12 }}>
+              Trọng số để tính điểm tổng.
+            </div>
+          </Form.Item>
+            )}
+          </Form.Item>
+          <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
+            <Input placeholder="VND, khách, đơn..." />
+          </Form.Item>
+          <Form.Item name="targetDate" label="Hạn hoàn thành" rules={[{ required: true }]}>
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="distributionStrategy" label="Cách phân bổ" initialValue="equal">
+            <Select
+              options={[
+                { value: 'equal', label: 'Chia đều cho phân xưởng' },
+                { value: 'percent', label: 'Chia theo % từng phân xưởng' },
+              ]}
+            />
+            <div style={{ color: '#f5222d', marginTop: 4, fontSize: 12 }}>
+              * Chọn “Chia theo %” sẽ nhập tỷ lệ khi bấm Phân bổ.
+            </div>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Chỉnh sửa KPI BSC"
+        open={editOpen}
+        onCancel={() => {
+          setEditOpen(false);
+          setEditingKpi(null);
+        }}
+        onOk={handleUpdate}
+        okButtonProps={{ loading: saving }}
+        destroyOnHide
+      >
+        <Form form={editForm} layout="vertical">
+          <Form.Item name="title" label="Tên KPI" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="category" label="Góc độ BSC" rules={[{ required: true }]}>
+            <Select options={categories} />
+          </Form.Item>
+          <Form.Item
+            name="targetValue"
+            label="Giá trị mục tiêu"
+            rules={[{ required: true, type: 'number', min: 0 }]}
+          >
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="weight"
+            label="Trọng số (%)"
+            rules={[{ type: 'number', min: 0, max: 100 }]}
+          >
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber style={{ width: '100%' }} />
+              <Button disabled>%</Button>
+            </Space.Compact>
+          </Form.Item>
+          <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="targetDate" label="Hạn hoàn thành" rules={[{ required: true }]}>
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="description" label="Mô tả" rules={[{ max: 300 }]}>
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

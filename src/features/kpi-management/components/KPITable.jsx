@@ -48,17 +48,17 @@ const KPITable = ({ kpis, loading, onEdit, onDelete }) => {
         rowSpan: record.perspectiveRowSpan,
         style: {
           background: record.perspectiveRowSpan > 0
-            ? `${PERSPECTIVE_COLORS[record.perspectiveLabel]}15`
+            ? `${PERSPECTIVE_COLORS[record.perspectiveLabel] || '#e6f7ff'}15`
             : undefined,
           fontWeight: 600,
-          color: PERSPECTIVE_COLORS[record.perspectiveLabel],
+          color: PERSPECTIVE_COLORS[record.perspectiveLabel] || '#595959',
           verticalAlign: 'middle',
           textAlign: 'center',
         },
       }),
       render: (text, record) => (
-        <Text strong style={{ color: PERSPECTIVE_COLORS[record.perspectiveLabel] }}>
-          {text}
+        <Text strong style={{ color: PERSPECTIVE_COLORS[record.perspectiveLabel] || '#595959' }}>
+          {text || 'Khác'}
         </Text>
       ),
     },
@@ -66,10 +66,11 @@ const KPITable = ({ kpis, loading, onEdit, onDelete }) => {
       title: 'Tên KPI',
       dataIndex: 'name',
       key: 'name',
+      width: 240,
       ellipsis: { showTitle: false },
       render: (name) => (
-        <Tooltip title={name} placement="topLeft">
-          <Text>{name}</Text>
+        <Tooltip title={name || '—'} placement="topLeft">
+          <Text>{name || '—'}</Text>
         </Tooltip>
       ),
     },
@@ -162,9 +163,8 @@ const KPITable = ({ kpis, loading, onEdit, onDelete }) => {
       dataSource={tableData}
       loading={loading}
       pagination={false}
-      scroll={{ x: 900 }}
+      scroll={{ x: 1200 }}
       size="middle"
-      bordered
       rowKey="id"
     />
   );

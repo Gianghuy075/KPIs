@@ -1,8 +1,8 @@
 import { apiClient } from './apiClient';
 
 export const companyKpiService = {
-  async list() {
-    const res = await apiClient.get('/kpis');
+  async list(params) {
+    const res = await apiClient.get('/kpis', { params });
     return res.data ?? res;
   },
   async create(payload) {
