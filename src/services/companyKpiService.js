@@ -17,8 +17,8 @@ export const companyKpiService = {
     const res = await apiClient.delete(`/kpis/${id}`);
     return res.data ?? res;
   },
-  async distribute(id) {
-    const res = await apiClient.post(`/kpis/${id}/distribute`);
+  async distribute(id, payload = {}) {
+    const res = await apiClient.post(`/kpis/${id}/distribute`, payload);
     return res.data ?? res;
   },
 };

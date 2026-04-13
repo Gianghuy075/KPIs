@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Dashboard from '../pages/Dashboard';
 import Login from '../pages/Login';
@@ -27,6 +27,7 @@ import YearlyEvaluation from '../pages/admin/YearlyEvaluation';
 
 const AppRouter = () => {
   const { user, initialized } = useAuth();
+  const location = useLocation();
 
   if (!initialized) {
     return null;
