@@ -28,6 +28,8 @@ const BranchKPI = () => {
   const [isDefault, setIsDefault] = useState(true);
   const [weightLoading, setWeightLoading] = useState(false);
   const [weightSaving, setWeightSaving] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const branchId = user?.branch?._id || user?.branch;
 
@@ -62,9 +64,23 @@ const BranchKPI = () => {
     }
   };
 
+  const loadHistory = async () => {
+    if (!branchId) return;
+    setHistoryLoading(true);
+    try {
+      const data = await categoryWeightService.getBranchHistory(branchId);
+      setHistory(data);
+    } catch {
+      message.error('Không tải được lịch sử');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   useEffect(() => {
     load();
     loadWeights();
+    loadHistory();
   }, [branchId]);
 
   const updateWeight = (category, value) => {
@@ -92,6 +108,42 @@ const BranchKPI = () => {
       setWeightSaving(false);
     }
   };
+
+  const CATEGORY_LABEL = {
+    business: 'Tài chính',
+    customer: 'Khách hàng',
+    internal: 'Quy trình nội bộ',
+    learning: 'Học hỏi & Phát triển',
+  };
+
+  const historyColumns = [
+    {
+      title: 'Thời gian',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 170,
+      render: (v) => dayjs(v).format('DD/MM/YYYY HH:mm:ss'),
+    },
+    {
+      title: 'Người thay đổi',
+      key: 'changedBy',
+      width: 160,
+      render: (_, record) => record.changedBy?.name || record.changedBy?.username || '—',
+    },
+    {
+      title: 'Trọng số đã lưu',
+      key: 'weights',
+      render: (_, record) => (
+        <Space size={4} wrap>
+          {record.weights.map((w) => (
+            <Tag key={w.category} color="blue">
+              {CATEGORY_LABEL[w.category] || w.category}: {w.weight}%
+            </Tag>
+          ))}
+        </Space>
+      ),
+    },
+  ];
 
   const weightColumns = [
     {
@@ -177,6 +229,23 @@ const BranchKPI = () => {
           loading={weightLoading}
           pagination={false}
           size="small"
+        />
+      </Card>
+
+      <Card
+        title="Lịch sử thay đổi trọng số"
+        extra={
+          <Button icon={<ReloadOutlined />} size="small" onClick={loadHistory} loading={historyLoading} />
+        }
+      >
+        <Table
+          columns={historyColumns}
+          dataSource={history}
+          rowKey="_id"
+          loading={historyLoading}
+          pagination={{ pageSize: 10, showSizeChanger: false }}
+          size="small"
+          locale={{ emptyText: 'Chưa có lịch sử thay đổi' }}
         />
       </Card>
 

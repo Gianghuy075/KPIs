@@ -12,4 +12,10 @@ export const categoryWeightService = {
 
   setBranchWeights: (branchId, weights) =>
     apiClient.put(`/category-weights/branch/${branchId}`, { weights }).then((r) => r.data),
+
+  getAdminHistory: () =>
+    apiClient.get('/category-weights/admin/history').then((r) => r.data),
+
+  getBranchHistory: (branchId) =>
+    apiClient.get(`/category-weights/branch/${branchId}/history`).then((r) => r.data),
 };
