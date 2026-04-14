@@ -9,9 +9,8 @@ import BranchManagement from '../pages/admin/BranchManagement';
 // import DepartmentManagement from '../pages/admin/DepartmentManagement';
 // import DepartmentManagers from '../pages/admin/DepartmentManagers';
 import KPIManagement from '../pages/admin/KPIManagement';
-import KPIDashboards from '../pages/admin/KPIDashboards';
-import DepartmentKPIDashboard from '../pages/admin/DepartmentKPIDashboard';
 import CompanyKPI from '../pages/admin/CompanyKPI';
+import BSCWeightManagement from '../pages/admin/BSCWeightManagement';
 import BranchKPI from '../pages/branch/BranchKPI';
 import MyKPI from '../pages/employee/MyKPI';
 import NotificationManagement from '../pages/admin/NotificationManagement';
@@ -51,13 +50,12 @@ const AppRouter = () => {
           {user?.role === 'senior_manager' && (
             <>
               <Route path="/admin/kpis-bsc" element={<CompanyKPI />} />
+              <Route path="/admin/bsc-weights" element={<BSCWeightManagement />} />
               <Route path="/admin/employee" element={<UserManagement />} />
               <Route path="/admin/branches" element={<BranchManagement />} />
               {/* Phòng ban & trưởng phân xưởng đang tạm ẩn */}
               <Route path="/admin/notifications" element={<NotificationManagement />} />
               <Route path="/admin/kpi-management" element={<KPIManagement />} />
-              <Route path="/admin/kpi-dashboards" element={<KPIDashboards />} />
-              <Route path="/admin/kpi-dashboards/:departmentId" element={<DepartmentKPIDashboard />} />
               <Route path="/admin/monthly-work" element={<MonthlyWorkManagement />} />
               <Route path="/admin/quarterly-work" element={<QuarterlyWorkManagement />} />
               <Route path="/admin/yearly-work" element={<YearlyWorkManagement />} />

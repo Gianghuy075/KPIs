@@ -16,10 +16,12 @@ import {
   Select,
   App as AntApp,
 } from 'antd';
-import { ReloadOutlined, TrophyOutlined, PlusOutlined } from '@ant-design/icons';
+import { ReloadOutlined, TrophyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { companyKpiService } from '../services/companyKpiService';
+import { categoryWeightService } from '../services/categoryWeightService';
+import { useAuth } from '../contexts/AuthContext';
 import StatisticsCard from '../components/StatisticsCard';
 import PerspectivePieChart from '../components/Charts/PerspectivePieChart';
 import NotificationBar from '../components/Notifications/NotificationBar';
@@ -36,23 +38,30 @@ const categories = [
 
 const Dashboard = () => {
   const { message, modal } = AntApp.useApp();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [rawKpis, setRawKpis] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [categoryWeights, setCategoryWeights] = useState({});
   const [editOpen, setEditOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editForm] = Form.useForm();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm] = Form.useForm();
 
   const fetchKPIs = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await companyKpiService.list();
+      const [res, weightData] = await Promise.all([
+        companyKpiService.list(),
+        user?.role === 'branch_manager'
+          ? categoryWeightService.getBranchWeights(user.branch?._id || user.branch)
+          : categoryWeightService.getAdminWeights(),
+      ]);
       setRawKpis(res || []);
+      const weightMap = Object.fromEntries((weightData || []).map((w) => [w.category, w.weight]));
+      setCategoryWeights(weightMap);
     } catch (err) {
       setError(err?.message || 'Không tải được KPI');
     } finally {
@@ -81,6 +90,8 @@ const Dashboard = () => {
         id: kpi._id || kpi.id,
         name: kpi.title || '—',
         unit: kpi.unit || '',
+        category: kpi.category,
+        categoryWeight: categoryWeights[kpi.category] ?? 0,
         weight: Number(kpi.weight || 0),
         target: targetValue,
         actual: actualValue,
@@ -89,7 +100,7 @@ const Dashboard = () => {
         perspective: perspectiveLabel,
       };
     });
-  }, [rawKpis]);
+  }, [rawKpis, categoryWeights]);
 
   const stats = useMemo(() => {
     if (!kpis.length) return null;
@@ -148,7 +159,6 @@ const Dashboard = () => {
       category: kpi.category,
       targetValue: kpi.targetValue,
       unit: kpi.unit,
-      weight: kpi.weight || 0,
       targetDate: kpi.targetDate ? dayjs(kpi.targetDate) : null,
       description: kpi.description,
     });
@@ -164,7 +174,6 @@ const Dashboard = () => {
         category: values.category,
         targetValue: values.targetValue,
         unit: values.unit,
-        weight: values.weight ?? 0,
         targetDate: values.targetDate?.toISOString(),
         description: values.description,
       });
@@ -216,7 +225,7 @@ const Dashboard = () => {
       )}
 
       {/* Page Header */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 24, marginTop: 16 }}>
         <Row justify="space-between" align="middle">
           <Col>
             <Space>
@@ -233,9 +242,6 @@ const Dashboard = () => {
             <Space>
               <Button icon={<ReloadOutlined />} onClick={fetchKPIs} loading={loading}>
                 Làm mới
-              </Button>
-              <Button icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-                Tạo KPI
               </Button>
               <Button type="primary" onClick={() => navigate('/admin/kpis-bsc')}>
                 Quản lý KPI
@@ -349,94 +355,8 @@ const Dashboard = () => {
         }
         styles={{ body: { padding: 0 } }}
       >
-        <KPITable kpis={kpis} loading={loading} onEdit={openEdit} onDelete={handleDelete} />
+        <KPITable kpis={kpis} loading={loading} onEdit={openEdit} onDelete={handleDelete} categoryWeights={categoryWeights} />
       </Card>
-
-      {/* Create KPI */}
-      <Modal
-        title="Tạo KPI BSC"
-        open={createOpen}
-        onCancel={() => setCreateOpen(false)}
-        onOk={async () => {
-          try {
-            const values = await createForm.validateFields();
-            setSaving(true);
-            const payload = {
-              title: values.title,
-              category: values.category,
-              targetValue: values.targetValue,
-              unit: values.unit,
-              targetDate: values.targetDate?.toISOString(),
-              distributionStrategy: values.distributionStrategy || 'equal',
-              weight: Number(values.weight ?? 0),
-            };
-            await companyKpiService.create(payload);
-            message.success('Đã tạo KPI');
-            setCreateOpen(false);
-            createForm.resetFields();
-            fetchKPIs();
-          } catch (err) {
-            if (!err?.errorFields) message.error('Tạo KPI thất bại');
-          } finally {
-            setSaving(false);
-          }
-        }}
-        okButtonProps={{ loading: saving }}
-        destroyOnHide
-      >
-        <Form form={createForm} layout="vertical">
-          <Form.Item name="title" label="Tên KPI" rules={[{ required: true }]}>
-            <Input placeholder="VD: Doanh thu tháng 7/2026" />
-          </Form.Item>
-          <Form.Item name="category" label="Góc độ BSC" rules={[{ required: true }]}>
-            <Select options={categories} />
-          </Form.Item>
-          <Form.Item
-            name="targetValue"
-            label="Giá trị mục tiêu"
-            rules={[{ required: true, type: 'number', min: 0 }]}
-          >
-            <InputNumber style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {() => (
-          <Form.Item
-            name="weight"
-            label="Trọng số (%)"
-            rules={[
-              { required: true, message: 'Nhập trọng số' },
-              { type: 'number', min: 0, max: 100 },
-            ]}
-          >
-            <Space.Compact style={{ width: '100%' }}>
-              <InputNumber style={{ width: '100%' }} />
-              <Button disabled>%</Button>
-            </Space.Compact>
-            <div style={{ color: '#999', marginTop: 4, fontSize: 12 }}>
-              Trọng số để tính điểm tổng.
-            </div>
-          </Form.Item>
-            )}
-          </Form.Item>
-          <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
-            <Input placeholder="VND, khách, đơn..." />
-          </Form.Item>
-          <Form.Item name="targetDate" label="Hạn hoàn thành" rules={[{ required: true }]}>
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="distributionStrategy" label="Cách phân bổ" initialValue="equal">
-            <Select
-              options={[
-                { value: 'equal', label: 'Chia đều cho phân xưởng' },
-                { value: 'percent', label: 'Chia theo % từng phân xưởng' },
-              ]}
-            />
-            <div style={{ color: '#f5222d', marginTop: 4, fontSize: 12 }}>
-              * Chọn “Chia theo %” sẽ nhập tỷ lệ khi bấm Phân bổ.
-            </div>
-          </Form.Item>
-        </Form>
-      </Modal>
 
       <Modal
         title="Chỉnh sửa KPI BSC"
@@ -462,16 +382,6 @@ const Dashboard = () => {
             rules={[{ required: true, type: 'number', min: 0 }]}
           >
             <InputNumber style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item
-            name="weight"
-            label="Trọng số (%)"
-            rules={[{ type: 'number', min: 0, max: 100 }]}
-          >
-            <Space.Compact style={{ width: '100%' }}>
-              <InputNumber style={{ width: '100%' }} />
-              <Button disabled>%</Button>
-            </Space.Compact>
           </Form.Item>
           <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
             <Input />

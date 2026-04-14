@@ -13,7 +13,7 @@ const formatValue = (value, unit) => {
   return `${new Intl.NumberFormat('vi-VN').format(value)} ${unit}`;
 };
 
-const KPITable = ({ kpis, loading, onEdit, onDelete }) => {
+const KPITable = ({ kpis, loading, onEdit, onDelete, categoryWeights = {} }) => {
   const tableData = useMemo(() => {
     if (!kpis || kpis.length === 0) return [];
 
@@ -31,6 +31,7 @@ const KPITable = ({ kpis, loading, onEdit, onDelete }) => {
         rows.push({
           ...item,
           perspectiveRowSpan: index === 0 ? items.length : 0,
+          weightRowSpan: index === 0 ? items.length : 0,
           perspectiveLabel: perspective,
         });
       });
@@ -63,6 +64,18 @@ const KPITable = ({ kpis, loading, onEdit, onDelete }) => {
       ),
     },
     {
+      title: 'Trọng số',
+      dataIndex: 'categoryWeight',
+      key: 'weight',
+      width: 90,
+      align: 'center',
+      onCell: (record) => ({
+        rowSpan: record.weightRowSpan,
+        style: { verticalAlign: 'middle', textAlign: 'center', borderRight: '2px solid #f0f0f0' },
+      }),
+      render: (weight) => <Tag color="blue">{weight ?? 0}%</Tag>,
+    },
+    {
       title: 'Tên KPI',
       dataIndex: 'name',
       key: 'name',
@@ -73,14 +86,6 @@ const KPITable = ({ kpis, loading, onEdit, onDelete }) => {
           <Text>{name || '—'}</Text>
         </Tooltip>
       ),
-    },
-    {
-      title: 'Trọng số',
-      dataIndex: 'weight',
-      key: 'weight',
-      width: 90,
-      align: 'center',
-      render: (weight) => <Tag color="blue">{weight}%</Tag>,
     },
     {
       title: 'Mục tiêu',

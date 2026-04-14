@@ -13,6 +13,7 @@ import {
   FileTextOutlined,
   CalendarOutlined,
   CheckOutlined,
+  PercentageOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -27,7 +28,8 @@ const breadcrumbMap = {
   '/admin/branches': 'Quản lý Chi nhánh',
   // Phòng ban đã ẩn
   '/admin/kpi-management': 'Quản lý KPI Phòng ban',
-  '/admin/kpi-dashboards': 'Quản lý KPIs',
+  '/admin/kpis-bsc': 'KPI BSC (Công ty)',
+  '/admin/bsc-weights': 'Trọng số Góc độ BSC',
   '/admin/notifications': 'Quản lý Thông báo',
   '/admin/monthly-work': 'Quản lý Công việc Hàng tháng',
   '/admin/quarterly-work': 'Quản lý Công việc Hàng quý',
@@ -38,7 +40,6 @@ const breadcrumbMap = {
   '/admin/daily-evaluation': 'Quản lý Đánh giá Hàng ngày',
   '/admin/monthly-evaluation': 'Quản lý Đánh giá Hàng tháng',
   '/admin/yearly-evaluation': 'Quản lý Đánh giá Hàng năm',
-  '/admin/kpis-bsc': 'KPI BSC (Công ty)',
   '/branch/kpis': 'KPI Phân xưởng',
   '/me/kpis': 'KPI của tôi',
 };
@@ -63,11 +64,6 @@ const MainLayout = ({ children }) => {
     if (user?.role === 'senior_manager') {
       baseItems.push(
         {
-          key: '/admin/kpi-dashboards',
-          icon: <BarChartOutlined />,
-          label: 'Quản lý KPIs',
-        },
-        {
           key: 'management',
           icon: <SettingOutlined />,
           label: 'Quản lý Hệ thống',
@@ -76,6 +72,11 @@ const MainLayout = ({ children }) => {
               key: '/admin/kpis-bsc',
               icon: <BarChartOutlined />,
               label: 'KPI BSC (Công ty)',
+            },
+            {
+              key: '/admin/bsc-weights',
+              icon: <PercentageOutlined />,
+              label: 'Trọng số BSC',
             },
             {
               key: '/admin/notifications',

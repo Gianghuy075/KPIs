@@ -12,6 +12,46 @@ const categories = [
   { value: 'learning', label: 'Học tập & Phát triển' },
 ];
 
+const isPercentStrategy = strategy => {
+  const normalized = String(strategy || '')
+    .trim()
+    .toLowerCase();
+  return normalized === 'percent' || normalized === 'chia theo %';
+};
+
+const buildInitialPercentAllocations = branches => {
+  if (!branches?.length) return [];
+  const count = branches.length;
+  const base = Number((100 / count).toFixed(2));
+  const allocations = branches.map(branch => ({
+    branchId: branch._id || branch.id,
+    percent: base,
+  }));
+  const total = Number((base * count).toFixed(2));
+  const diff = Number((100 - total).toFixed(2));
+  allocations[count - 1].percent = Number((allocations[count - 1].percent + diff).toFixed(2));
+  return allocations;
+};
+
+const getEntityId = entity => entity?._id || entity?.id;
+const extractDistributionStrategy = strategy => {
+  if (strategy && typeof strategy === 'object') {
+    const valueLike = strategy.value ?? strategy.key ?? strategy.label ?? '';
+    return extractDistributionStrategy(valueLike);
+  }
+  return String(strategy || '')
+    .trim()
+    .toLowerCase();
+};
+
+const normalizeDistributionStrategy = strategy => {
+  const normalized = extractDistributionStrategy(strategy);
+  if (normalized === 'percent' || normalized.includes('%')) return 'percent';
+  if (normalized === 'manual') return 'manual';
+  if (normalized === 'equal' || normalized.includes('đều')) return 'equal';
+  return 'equal';
+};
+
 const CompanyKPI = () => {
   const { modal, message } = AntApp.useApp();
   const [data, setData] = useState([]);
@@ -50,9 +90,10 @@ const CompanyKPI = () => {
     try {
       const payload = {
         ...values,
+        distributionStrategy: normalizeDistributionStrategy(values.distributionStrategy),
         targetDate: values.targetDate.toISOString(),
-        weight: Number(values.weight ?? 0),
       };
+      console.log('[CompanyKPI] Create payload:', payload);
       await companyKpiService.create(payload);
       message.success('Tạo KPI thành công');
       load(filters);
@@ -64,21 +105,29 @@ const CompanyKPI = () => {
   };
 
   const handleDistribute = async record => {
-    if (record.distributionStrategy === 'percent') {
+    const kpiId = getEntityId(record);
+    if (record.status !== 'draft') {
+      message.warning('Chỉ phân bổ được KPI ở trạng thái Nháp');
+      return;
+    }
+
+    if (!branches.length) {
+      message.warning('Chưa có phân xưởng để phân bổ');
+      return;
+    }
+
+    if (isPercentStrategy(record.distributionStrategy)) {
       message.info('KPI này cần nhập % cho từng phân xưởng');
-      const initial = branches.map(b => ({
-        branchId: b._id,
-        percent: +(100 / branches.length).toFixed(1),
-      }));
+      const initial = buildInitialPercentAllocations(branches);
       allocForm.setFieldsValue({ allocations: initial });
       setCurrentKpi(record);
       setAllocModalOpen(true);
       return;
     }
 
-    setDistributingId(record._id);
+    setDistributingId(kpiId);
     try {
-      await companyKpiService.distribute(record._id);
+      await companyKpiService.distribute(kpiId);
       message.success('Đã phân bổ xuống phân xưởng');
       load(filters);
     } catch {
@@ -95,7 +144,6 @@ const CompanyKPI = () => {
       category: record.category,
       targetValue: record.targetValue,
       unit: record.unit,
-      weight: record.weight || 0,
       targetDate: dayjs(record.targetDate),
       distributionStrategy: record.distributionStrategy,
     });
@@ -112,10 +160,9 @@ const CompanyKPI = () => {
         targetValue: values.targetValue,
         unit: values.unit,
         targetDate: values.targetDate?.toISOString(),
-        distributionStrategy: values.distributionStrategy,
-        weight: Number(values.weight ?? 0),
+        distributionStrategy: normalizeDistributionStrategy(values.distributionStrategy),
       };
-      await companyKpiService.update(currentKpi._id, payload);
+      await companyKpiService.update(getEntityId(currentKpi), payload);
       message.success('Đã cập nhật KPI');
       setEditOpen(false);
       setCurrentKpi(null);
@@ -135,8 +182,9 @@ const CompanyKPI = () => {
         message.error('Tổng % phải bằng 100');
         return;
       }
-      setDistributingId(currentKpi._id);
-      await companyKpiService.distribute(currentKpi._id, { strategy: 'percent', allocations });
+      const kpiId = getEntityId(currentKpi);
+      setDistributingId(kpiId);
+      await companyKpiService.distribute(kpiId, { strategy: 'percent', allocations });
       message.success('Đã phân bổ theo %');
       setAllocModalOpen(false);
       setCurrentKpi(null);
@@ -190,7 +238,14 @@ const CompanyKPI = () => {
       title: 'Chiến lược',
       dataIndex: 'distributionStrategy',
       key: 'distributionStrategy',
-      render: v => (v === 'equal' ? 'Chia đều' : v === 'percent' ? 'Chia theo %' : v),
+      render: v => {
+        const strategy = normalizeDistributionStrategy(v);
+        return strategy === 'percent'
+          ? 'Chia theo %'
+          : strategy === 'equal'
+            ? 'Chia đều'
+            : strategy;
+      },
     },
     {
       title: 'Trạng thái',
@@ -215,16 +270,12 @@ const CompanyKPI = () => {
       key: 'actions',
       render: (_, record) => (
         <Space>
-          <Button
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => handleEdit(record)}
-          />
+          <Button icon={<EditOutlined />} size="small" onClick={() => handleEdit(record)} />
           <Button
             icon={<SendOutlined />}
             size="small"
-            disabled={record.status !== 'draft' || distributingId === record._id}
-            loading={distributingId === record._id}
+            disabled={record.status !== 'draft' || distributingId === getEntityId(record)}
+            loading={distributingId === getEntityId(record)}
             onClick={() => handleDistribute(record)}
           >
             Phân bổ
@@ -233,7 +284,7 @@ const CompanyKPI = () => {
             icon={<DeleteOutlined />}
             size="small"
             danger
-            onClick={() => handleDelete(record._id)}
+            onClick={() => handleDelete(getEntityId(record))}
           />
         </Space>
       ),
@@ -256,7 +307,7 @@ const CompanyKPI = () => {
         form={filterForm}
         layout="inline"
         style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}
-        onFinish={(vals) => {
+        onFinish={vals => {
           const next = {
             search: vals.search || undefined,
             category: vals.category || undefined,
@@ -272,12 +323,7 @@ const CompanyKPI = () => {
           <Input allowClear placeholder="Tìm tên KPI" style={{ minWidth: 200 }} />
         </Form.Item>
         <Form.Item name="category">
-          <Select
-            allowClear
-            placeholder="Góc độ"
-            options={categories}
-            style={{ width: 160 }}
-          />
+          <Select allowClear placeholder="Góc độ" options={categories} style={{ width: 160 }} />
         </Form.Item>
         <Form.Item name="status">
           <Select
@@ -308,7 +354,9 @@ const CompanyKPI = () => {
         </Form.Item>
         <Form.Item>
           <Space>
-            <Button type="primary" htmlType="submit">Lọc</Button>
+            <Button type="primary" htmlType="submit">
+              Lọc
+            </Button>
             <Button
               onClick={() => {
                 filterForm.resetFields();
@@ -321,7 +369,7 @@ const CompanyKPI = () => {
         </Form.Item>
       </Form>
 
-      <Table columns={columns} dataSource={data} loading={loading} rowKey="_id" />
+      <Table columns={columns} dataSource={data} loading={loading} rowKey={getEntityId} />
 
       <Modal
         title="Phân bổ theo % cho phân xưởng"
@@ -331,7 +379,7 @@ const CompanyKPI = () => {
           setCurrentKpi(null);
         }}
         onOk={submitPercentAlloc}
-        okButtonProps={{ loading: distributingId === currentKpi?._id }}
+        okButtonProps={{ loading: distributingId === getEntityId(currentKpi) }}
         destroyOnHide
       >
         <Form form={allocForm} layout="vertical">
@@ -350,22 +398,20 @@ const CompanyKPI = () => {
                     <div style={{ minWidth: 140 }}>
                       {branches[idx]?.name ||
                         branches.find(
-                          b => b._id === allocForm.getFieldValue(['allocations', idx, 'branchId']),
+                          b =>
+                            getEntityId(b) ===
+                            allocForm.getFieldValue(['allocations', idx, 'branchId']),
                         )?.name ||
                         'Phân xưởng'}
                     </div>
-                <Form.Item
-                  {...field}
-                  name={[field.name, 'percent']}
-                  rules={[{ required: true, message: 'Nhập %' }]}
-                >
-                  <Space.Compact>
-                    <Form.Item name={[field.name, 'percent']} noStyle>
-                      <InputNumber min={0} max={100} />
+                    <Form.Item
+                      {...field}
+                      name={[field.name, 'percent']}
+                      rules={[{ required: true, message: 'Nhập %' }]}
+                    >
+                      <InputNumber min={0} max={100} style={{ width: 120 }} />
                     </Form.Item>
-                    <Button disabled>%</Button>
-                  </Space.Compact>
-                </Form.Item>
+                    <span>%</span>
                   </Space>
                 ))}
               </div>
@@ -383,12 +429,17 @@ const CompanyKPI = () => {
         okText="Lưu"
         destroyOnHide
       >
-        <Form form={form} layout="vertical" onFinish={handleCreate}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleCreate}
+          initialValues={{ distributionStrategy: 'equal' }}
+        >
           <Form.Item name="title" label="Tên KPI" rules={[{ required: true }]}>
             <Input placeholder="VD: Doanh thu tháng 6/2026" />
           </Form.Item>
-          <Form.Item name="category" label="Category" rules={[{ required: true }]}>
-            <Select options={categories} placeholder="Chọn category" />
+          <Form.Item name="category" label="Góc độ BSC" rules={[{ required: true }]}>
+            <Select options={categories} placeholder="Chọn góc độ" />
           </Form.Item>
           <Form.Item
             name="targetValue"
@@ -397,45 +448,24 @@ const CompanyKPI = () => {
           >
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {() => (
-              <Form.Item
-                name="weight"
-                label="Trọng số (%)"
-                rules={[
-                  { required: true, message: 'Nhập trọng số' },
-                  { type: 'number', min: 0, max: 100 },
-                ]}
-              >
-                <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item name="weight" noStyle>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                  <Button disabled>%</Button>
-                </Space.Compact>
-                <div style={{ color: '#999', marginTop: 4, fontSize: 12 }}>
-                  Trọng số dùng để tính điểm BSC trên Dashboard.
-                </div>
-              </Form.Item>
-            )}
-          </Form.Item>
           <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
             <Input placeholder="VND, khách, đơn..." />
           </Form.Item>
           <Form.Item name="targetDate" label="Hạn hoàn thành" rules={[{ required: true }]}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="distributionStrategy" label="Cách phân bổ" initialValue="equal">
+          <Form.Item
+            name="distributionStrategy"
+            label="Cách phân bổ"
+            rules={[{ required: true, message: 'Vui lòng chọn cách phân bổ' }]}
+            extra="* Chọn Chia theo % sẽ yêu cầu nhập tỷ lệ từng phân xưởng khi bấm Phân bổ"
+          >
             <Select
               options={[
                 { value: 'equal', label: 'Chia đều cho phân xưởng' },
                 { value: 'percent', label: 'Chia theo % từng phân xưởng' },
               ]}
             />
-            <div style={{ color: '#f5222d', marginTop: 4, fontSize: 12 }}>
-              * Chọn Chia theo % cho từng công xưởng sẽ yêu cầu nhập tỷ lệ từng phân xưởng khi bấm
-              Phân bổ
-            </div>
           </Form.Item>
         </Form>
       </Modal>
@@ -455,8 +485,8 @@ const CompanyKPI = () => {
           <Form.Item name="title" label="Tên KPI" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="category" label="Category" rules={[{ required: true }]}>
-            <Select options={categories} placeholder="Chọn category" />
+          <Form.Item name="category" label="Góc độ BSC" rules={[{ required: true }]}>
+            <Select options={categories} placeholder="Chọn góc độ" />
           </Form.Item>
           <Form.Item
             name="targetValue"
@@ -465,29 +495,17 @@ const CompanyKPI = () => {
           >
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {() => (
-              <Form.Item
-                name="weight"
-                label="Trọng số (%)"
-                rules={[{ type: 'number', min: 0, max: 100 }]}
-              >
-                <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item name="weight" noStyle>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                  <Button disabled>%</Button>
-                </Space.Compact>
-              </Form.Item>
-            )}
-          </Form.Item>
           <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
             <Input placeholder="VND, khách, đơn..." />
           </Form.Item>
           <Form.Item name="targetDate" label="Hạn hoàn thành" rules={[{ required: true }]}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="distributionStrategy" label="Cách phân bổ" initialValue="equal">
+          <Form.Item
+            name="distributionStrategy"
+            label="Cách phân bổ"
+            rules={[{ required: true, message: 'Vui lòng chọn cách phân bổ' }]}
+          >
             <Select
               options={[
                 { value: 'equal', label: 'Chia đều cho phân xưởng' },
