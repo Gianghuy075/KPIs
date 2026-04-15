@@ -120,7 +120,13 @@ const BSCWeightManagement = () => {
       title: 'Người thay đổi',
       key: 'changedBy',
       width: 160,
-      render: (_, record) => record.changedBy?.name || record.changedBy?.username || '—',
+      render: (_, record) =>
+        record.changedBy?.displayName ||
+        record.changedBy?.fullName ||
+        record.changedBy?.name ||
+        record.changedBy?.username ||
+        record.changedBy?.email ||
+        '—',
     },
     {
       title: 'Trọng số đã lưu',

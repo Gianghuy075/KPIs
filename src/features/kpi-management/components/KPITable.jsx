@@ -13,7 +13,14 @@ const formatValue = (value, unit) => {
   return `${new Intl.NumberFormat('vi-VN').format(value)} ${unit}`;
 };
 
-const KPITable = ({ kpis, loading, onEdit, onDelete, categoryWeights = {} }) => {
+const KPITable = ({
+  kpis,
+  loading,
+  onEdit,
+  onDelete,
+  showActions = true,
+  categoryWeights = {},
+}) => {
   const tableData = useMemo(() => {
     if (!kpis || kpis.length === 0) return [];
 
@@ -129,7 +136,10 @@ const KPITable = ({ kpis, loading, onEdit, onDelete, categoryWeights = {} }) => 
         <Tag color={getStatusColor(status)}>{getStatusLabel(status)}</Tag>
       ),
     },
-    {
+  ];
+
+  if (showActions) {
+    columns.push({
       title: 'Hành động',
       key: 'actions',
       width: 100,
@@ -142,13 +152,13 @@ const KPITable = ({ kpis, loading, onEdit, onDelete, categoryWeights = {} }) => 
               type="text"
               size="small"
               icon={<EditOutlined />}
-              onClick={() => onEdit(record)}
+              onClick={() => onEdit?.(record)}
             />
           </Tooltip>
           <Popconfirm
             title="Xóa KPI"
             description="Bạn có chắc chắn muốn xóa KPI này không?"
-            onConfirm={() => onDelete(record.id)}
+            onConfirm={() => onDelete?.(record.id)}
             okText="Xóa"
             cancelText="Hủy"
             okButtonProps={{ danger: true }}
@@ -159,8 +169,8 @@ const KPITable = ({ kpis, loading, onEdit, onDelete, categoryWeights = {} }) => 
           </Popconfirm>
         </Space>
       ),
-    },
-  ];
+    });
+  }
 
   return (
     <Table

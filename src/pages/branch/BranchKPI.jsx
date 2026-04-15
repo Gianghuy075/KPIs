@@ -100,6 +100,7 @@ const BranchKPI = () => {
     setWeightSaving(true);
     try {
       await categoryWeightService.setBranchWeights(branchId, weights);
+      await Promise.all([loadWeights(), loadHistory()]);
       message.success('Đã lưu trọng số phân xưởng');
       setIsDefault(false);
     } catch (err) {
@@ -128,7 +129,13 @@ const BranchKPI = () => {
       title: 'Người thay đổi',
       key: 'changedBy',
       width: 160,
-      render: (_, record) => record.changedBy?.name || record.changedBy?.username || '—',
+      render: (_, record) =>
+        record.changedBy?.displayName ||
+        record.changedBy?.fullName ||
+        record.changedBy?.name ||
+        record.changedBy?.username ||
+        record.changedBy?.email ||
+        '—',
     },
     {
       title: 'Trọng số đã lưu',

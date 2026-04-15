@@ -20,6 +20,8 @@ import { ReloadOutlined, TrophyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { companyKpiService } from '../services/companyKpiService';
+import { branchKpiService } from '../services/branchKpiService';
+import { userKpiService } from '../services/userKpiService';
 import { categoryWeightService } from '../services/categoryWeightService';
 import { useAuth } from '../contexts/AuthContext';
 import StatisticsCard from '../components/StatisticsCard';
@@ -48,19 +50,37 @@ const Dashboard = () => {
   const [editingKpi, setEditingKpi] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editForm] = Form.useForm();
+  const branchId = user?.branch?._id || user?.branch;
+  const isSeniorManager = user?.role === 'senior_manager';
+  const isBranchManager = user?.role === 'branch_manager';
+  const isEmployee = user?.role === 'employee';
+  const canManageKpis = isSeniorManager;
 
   const fetchKPIs = async () => {
     setLoading(true);
     setError('');
     try {
-      const [res, weightData] = await Promise.all([
-        companyKpiService.list(),
-        user?.role === 'branch_manager'
-          ? categoryWeightService.getBranchWeights(user.branch?._id || user.branch)
-          : categoryWeightService.getAdminWeights(),
-      ]);
+      const kpiPromise = isSeniorManager
+        ? companyKpiService.list()
+        : isBranchManager
+          ? branchId
+            ? branchKpiService.listByBranch(branchId)
+            : Promise.resolve([])
+          : isEmployee
+            ? userKpiService.listMine()
+            : Promise.resolve([]);
+
+      const weightPromise = isSeniorManager
+        ? categoryWeightService.getAdminWeights()
+        : branchId
+          ? categoryWeightService.getBranchWeights(branchId)
+          : Promise.resolve([]);
+
+      const [res, weightData] = await Promise.all([kpiPromise, weightPromise]);
       setRawKpis(res || []);
-      const weightMap = Object.fromEntries((weightData || []).map((w) => [w.category, w.weight]));
+      const weightMap = Object.fromEntries(
+        (weightData || []).map((w) => [w.category, w.weight]),
+      );
       setCategoryWeights(weightMap);
     } catch (err) {
       setError(err?.message || 'Không tải được KPI');
@@ -71,7 +91,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchKPIs();
-  }, []);
+  }, [user?.role, branchId]);
 
   const kpis = useMemo(() => {
     const mapPerspective = {
@@ -81,26 +101,40 @@ const Dashboard = () => {
       learning: PERSPECTIVES.LEARNING,
     };
 
-    return (rawKpis || []).filter(Boolean).map((kpi) => {
-      const targetValue = Number(kpi.targetValue || 0);
-      const actualValue = Number(kpi.actualValue || 0);
-      const completionRate = targetValue > 0 ? Math.min((actualValue / targetValue) * 100, 150) : 0;
-      const perspectiveLabel = mapPerspective[kpi.category] || kpi.category || 'Khác';
-      return {
-        id: kpi._id || kpi.id,
-        name: kpi.title || '—',
-        unit: kpi.unit || '',
-        category: kpi.category,
-        categoryWeight: categoryWeights[kpi.category] ?? 0,
-        weight: Number(kpi.weight || 0),
-        target: targetValue,
-        actual: actualValue,
-        completionRate,
-        status: getStatus(completionRate),
-        perspective: perspectiveLabel,
-      };
-    });
-  }, [rawKpis, categoryWeights]);
+    return (rawKpis || [])
+      .filter(Boolean)
+      .map((kpi) => {
+        const companyKpi = isSeniorManager
+          ? kpi
+          : isBranchManager
+            ? kpi.companyKpi || {}
+            : kpi.branchKpi?.companyKpi || {};
+        const category = companyKpi.category || kpi.category;
+        const targetValue = Number(
+          isSeniorManager ? kpi.targetValue : kpi.allocatedValue || 0,
+        );
+        const actualValue = Number(kpi.actualValue || 0);
+        const completionRate =
+          targetValue > 0
+            ? Math.min((actualValue / targetValue) * 100, 150)
+            : 0;
+        const perspectiveLabel = mapPerspective[category] || category || 'Khác';
+
+        return {
+          id: kpi._id || kpi.id,
+          name: companyKpi.title || kpi.title || '—',
+          unit: kpi.unit || companyKpi.unit || '',
+          category,
+          categoryWeight: categoryWeights[category] ?? 0,
+          weight: Number(kpi.weight || 0),
+          target: targetValue,
+          actual: actualValue,
+          completionRate,
+          status: getStatus(completionRate),
+          perspective: perspectiveLabel,
+        };
+      });
+  }, [rawKpis, categoryWeights, isSeniorManager, isBranchManager]);
 
   const stats = useMemo(() => {
     if (!kpis.length) return null;
@@ -119,9 +153,10 @@ const Dashboard = () => {
       { weightedScore: 0, totalWeight: 0 },
     );
 
-    const overallScore = weighted.totalWeight > 0
-      ? (weighted.weightedScore / weighted.totalWeight) * 100
-      : kpis.reduce((sum, k) => sum + k.completionRate, 0) / kpis.length;
+    const overallScore =
+      weighted.totalWeight > 0
+        ? (weighted.weightedScore / weighted.totalWeight) * 100
+        : kpis.reduce((sum, k) => sum + k.completionRate, 0) / kpis.length;
 
     return {
       totalKPIs: kpis.length,
@@ -151,6 +186,7 @@ const Dashboard = () => {
   }, [kpis]);
 
   const openEdit = (record) => {
+    if (!canManageKpis) return;
     const kpi = rawKpis.find((k) => (k._id || k.id) === record.id);
     if (!kpi) return;
     setEditingKpi(kpi);
@@ -191,6 +227,7 @@ const Dashboard = () => {
   };
 
   const handleDelete = (id) => {
+    if (!canManageKpis) return;
     modal.confirm({
       title: 'Xóa KPI?',
       content: 'Bạn chắc chắn muốn xóa KPI này?',
@@ -234,7 +271,9 @@ const Dashboard = () => {
                 <Title level={3} style={{ margin: 0 }}>
                   Dashboard KPI - Balanced Scorecard
                 </Title>
-                <Text type="secondary">Quản lý và theo dõi chỉ số hiệu suất then chốt</Text>
+                <Text type="secondary">
+                  Quản lý và theo dõi chỉ số hiệu suất then chốt
+                </Text>
               </div>
             </Space>
           </Col>
@@ -243,9 +282,11 @@ const Dashboard = () => {
               <Button icon={<ReloadOutlined />} onClick={fetchKPIs} loading={loading}>
                 Làm mới
               </Button>
-              <Button type="primary" onClick={() => navigate('/admin/kpis-bsc')}>
-                Quản lý KPI
-              </Button>
+              {canManageKpis && (
+                <Button type="primary" onClick={() => navigate('/admin/kpis-bsc')}>
+                  Quản lý KPI
+                </Button>
+              )}
             </Space>
           </Col>
         </Row>
@@ -262,7 +303,11 @@ const Dashboard = () => {
               precision={1}
               progressPercent={Math.min(stats.overallScore, 100)}
               progressStatus={
-                stats.overallScore >= 100 ? 'success' : stats.overallScore >= 70 ? 'normal' : 'exception'
+                stats.overallScore >= 100
+                  ? 'success'
+                  : stats.overallScore >= 70
+                    ? 'normal'
+                    : 'exception'
               }
               tag={getStatusLabel(overallStatus)}
               tagColor={getStatusColor(overallStatus)}
@@ -326,12 +371,32 @@ const Dashboard = () => {
                   { color: '#faad14', label: 'Quy trình nội bộ', desc: 'Hiệu quả vận hành, chất lượng' },
                   { color: '#722ed1', label: 'Học hỏi & Phát triển', desc: 'Nhân sự, đổi mới, tri thức' },
                 ].map((item) => (
-                  <div key={item.label} style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                  <div
+                    key={item.label}
+                    style={{
+                      marginBottom: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        background: item.color,
+                        flexShrink: 0,
+                      }}
+                    />
                     <div>
-                      <Text strong style={{ fontSize: 13 }}>{item.label}</Text>
+                      <Text strong style={{ fontSize: 13 }}>
+                        {item.label}
+                      </Text>
                       <br />
-                      <Text type="secondary" style={{ fontSize: 12 }}>{item.desc}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {item.desc}
+                      </Text>
                     </div>
                   </div>
                 ))}
@@ -355,45 +420,54 @@ const Dashboard = () => {
         }
         styles={{ body: { padding: 0 } }}
       >
-        <KPITable kpis={kpis} loading={loading} onEdit={openEdit} onDelete={handleDelete} categoryWeights={categoryWeights} />
+        <KPITable
+          kpis={kpis}
+          loading={loading}
+          onEdit={canManageKpis ? openEdit : undefined}
+          onDelete={canManageKpis ? handleDelete : undefined}
+          showActions={canManageKpis}
+          categoryWeights={categoryWeights}
+        />
       </Card>
 
-      <Modal
-        title="Chỉnh sửa KPI BSC"
-        open={editOpen}
-        onCancel={() => {
-          setEditOpen(false);
-          setEditingKpi(null);
-        }}
-        onOk={handleUpdate}
-        okButtonProps={{ loading: saving }}
-        destroyOnHide
-      >
-        <Form form={editForm} layout="vertical">
-          <Form.Item name="title" label="Tên KPI" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="category" label="Góc độ BSC" rules={[{ required: true }]}>
-            <Select options={categories} />
-          </Form.Item>
-          <Form.Item
-            name="targetValue"
-            label="Giá trị mục tiêu"
-            rules={[{ required: true, type: 'number', min: 0 }]}
-          >
-            <InputNumber style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="targetDate" label="Hạn hoàn thành" rules={[{ required: true }]}>
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="description" label="Mô tả" rules={[{ max: 300 }]}>
-            <Input.TextArea rows={3} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {canManageKpis && (
+        <Modal
+          title="Chỉnh sửa KPI BSC"
+          open={editOpen}
+          onCancel={() => {
+            setEditOpen(false);
+            setEditingKpi(null);
+          }}
+          onOk={handleUpdate}
+          okButtonProps={{ loading: saving }}
+          destroyOnHide
+        >
+          <Form form={editForm} layout="vertical">
+            <Form.Item name="title" label="Tên KPI" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="category" label="Góc độ BSC" rules={[{ required: true }]}>
+              <Select options={categories} />
+            </Form.Item>
+            <Form.Item
+              name="targetValue"
+              label="Giá trị mục tiêu"
+              rules={[{ required: true, type: 'number', min: 0 }]}
+            >
+              <InputNumber style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="targetDate" label="Hạn hoàn thành" rules={[{ required: true }]}>
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="description" label="Mô tả" rules={[{ max: 300 }]}>
+              <Input.TextArea rows={3} />
+            </Form.Item>
+          </Form>
+        </Modal>
+      )}
     </div>
   );
 };
