@@ -6,82 +6,81 @@ import {
   Button,
   Space,
   Typography,
-  Divider,
   Alert,
+  Table,
+  Tag,
+  Select,
   Modal,
   Form,
   Input,
   InputNumber,
-  DatePicker,
-  Select,
   App as AntApp,
 } from 'antd';
-import { ReloadOutlined, TrophyOutlined } from '@ant-design/icons';
+import { ReloadOutlined, TrophyOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
-import { companyKpiService } from '../services/companyKpiService';
-import { branchKpiService } from '../services/branchKpiService';
-import { userKpiService } from '../services/userKpiService';
-import { categoryWeightService } from '../services/categoryWeightService';
 import { useAuth } from '../contexts/AuthContext';
+import workshopKpiService from '../services/workshopKpiService';
 import StatisticsCard from '../components/StatisticsCard';
 import PerspectivePieChart from '../components/Charts/PerspectivePieChart';
+import BscBarChart, { SHORT_NAMES } from '../components/Charts/BscBarChart';
+import MonthlyTrendChart from '../components/Charts/MonthlyTrendChart';
 import NotificationBar from '../components/Notifications/NotificationBar';
-import KPITable from '../features/kpi-management/components/KPITable';
-import { getStatus, getStatusLabel, getStatusColor, PERSPECTIVES } from '../utils/kpiUtils';
+import { getStatus, getStatusLabel, getStatusColor } from '../utils/kpiUtils';
+import { calcCompletionRate } from '../utils/bonusUtils';
 
 const { Title, Text } = Typography;
-const categories = [
-  { value: 'business', label: 'Kinh doanh' },
-  { value: 'customer', label: 'Khách hàng' },
-  { value: 'internal', label: 'Nội bộ' },
-  { value: 'learning', label: 'Học tập & Phát triển' },
-];
+
+const currentYear = new Date().getFullYear();
+const yearOptions = [currentYear - 1, currentYear, currentYear + 1].map(y => ({ value: y, label: String(y) }));
+
+const bscColorMap = {
+  'Tài chính': '#1d4ed8',
+  'Khách hàng': '#15803d',
+  'Quy trình nội bộ': '#b45309',
+  'Học hỏi & Phát triển': '#7c3aed',
+};
 
 const Dashboard = () => {
   const { message, modal } = AntApp.useApp();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [year, setYear] = useState(currentYear);
   const [rawKpis, setRawKpis] = useState([]);
+  const [bscCategories, setBscCategories] = useState([]);
+  const [allEntries, setAllEntries] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [categoryWeights, setCategoryWeights] = useState({});
   const [editOpen, setEditOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editForm] = Form.useForm();
-  const branchId = user?.branch?._id || user?.branch;
-  const isSeniorManager = user?.role === 'senior_manager';
-  const isBranchManager = user?.role === 'branch_manager';
-  const isEmployee = user?.role === 'employee';
-  const canManageKpis = isSeniorManager;
+
+  const isAdmin = user?.role === 'system_admin';
+  const canManageKpis = isAdmin;
+  const phanXuongId = user?.phanXuongId;
+
+  useEffect(() => {
+    workshopKpiService.listBscCategories().then(setBscCategories).catch(() => {});
+  }, []);
 
   const fetchKPIs = async () => {
     setLoading(true);
     setError('');
     try {
-      const kpiPromise = isSeniorManager
-        ? companyKpiService.list()
-        : isBranchManager
-          ? branchId
-            ? branchKpiService.listByBranch(branchId)
-            : Promise.resolve([])
-          : isEmployee
-            ? userKpiService.listMine()
-            : Promise.resolve([]);
-
-      const weightPromise = isSeniorManager
-        ? categoryWeightService.getAdminWeights()
-        : branchId
-          ? categoryWeightService.getBranchWeights(branchId)
-          : Promise.resolve([]);
-
-      const [res, weightData] = await Promise.all([kpiPromise, weightPromise]);
-      setRawKpis(res || []);
-      const weightMap = Object.fromEntries(
-        (weightData || []).map((w) => [w.category, w.weight]),
-      );
-      setCategoryWeights(weightMap);
+      const params = { year };
+      if (!isAdmin && phanXuongId) params.phanXuongId = phanXuongId;
+      const kpiList = await workshopKpiService.list(params);
+      setRawKpis(kpiList || []);
+      const entriesMap = {};
+      await Promise.all((kpiList || []).map(async (kpi) => {
+        try {
+          const entries = await workshopKpiService.getMonthlyEntries(kpi.id);
+          entriesMap[kpi.id] = entries;
+        } catch {
+          entriesMap[kpi.id] = [];
+        }
+      }));
+      setAllEntries(entriesMap);
     } catch (err) {
       setError(err?.message || 'Không tải được KPI');
     } finally {
@@ -91,73 +90,50 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchKPIs();
-  }, [user?.role, branchId]);
+  }, [user?.role, year, phanXuongId]);
 
-  const kpis = useMemo(() => {
-    const mapPerspective = {
-      business: PERSPECTIVES.FINANCIAL,
-      customer: PERSPECTIVES.CUSTOMER,
-      internal: PERSPECTIVES.INTERNAL,
-      learning: PERSPECTIVES.LEARNING,
+  const bscCategoryMap = useMemo(() => {
+    const map = {};
+    bscCategories.forEach(c => { map[c.id] = c.name; });
+    return map;
+  }, [bscCategories]);
+
+  const kpis = useMemo(() => rawKpis.map(kpi => {
+    const entries = allEntries[kpi.id] || [];
+    const withData = entries.filter(e => e.actualValue != null);
+    const actual = withData.length ? withData[withData.length - 1].actualValue : null;
+    const completionRate = actual != null && kpi.targetValue
+      ? calcCompletionRate(Number(actual), Number(kpi.targetValue))
+      : 0;
+    return {
+      id: kpi.id,
+      name: kpi.name,
+      unit: kpi.targetUnit || '',
+      weight: Number(kpi.weight || 0),
+      target: Number(kpi.targetValue || 0),
+      actual: actual ?? null,
+      completionRate,
+      bsc: bscCategoryMap[kpi.bscCategoryId] || 'Khác',
+      status: getStatus(completionRate),
     };
-
-    return (rawKpis || [])
-      .filter(Boolean)
-      .map((kpi) => {
-        const companyKpi = isSeniorManager
-          ? kpi
-          : isBranchManager
-            ? kpi.companyKpi || {}
-            : kpi.branchKpi?.companyKpi || {};
-        const category = companyKpi.category || kpi.category;
-        const targetValue = Number(
-          isSeniorManager ? kpi.targetValue : kpi.allocatedValue || 0,
-        );
-        const actualValue = Number(kpi.actualValue || 0);
-        const completionRate =
-          targetValue > 0
-            ? Math.min((actualValue / targetValue) * 100, 150)
-            : 0;
-        const perspectiveLabel = mapPerspective[category] || category || 'Khác';
-
-        return {
-          id: kpi._id || kpi.id,
-          name: companyKpi.title || kpi.title || '—',
-          unit: kpi.unit || companyKpi.unit || '',
-          category,
-          categoryWeight: categoryWeights[category] ?? 0,
-          weight: Number(kpi.weight || 0),
-          target: targetValue,
-          actual: actualValue,
-          completionRate,
-          status: getStatus(completionRate),
-          perspective: perspectiveLabel,
-        };
-      });
-  }, [rawKpis, categoryWeights, isSeniorManager, isBranchManager]);
+  }), [rawKpis, allEntries, bscCategoryMap]);
 
   const stats = useMemo(() => {
     if (!kpis.length) return null;
-
-    const completed = kpis.filter((k) => k.status === 'completed').length;
-    const warning = kpis.filter((k) => k.status === 'warning').length;
-    const risk = kpis.filter((k) => k.status === 'risk').length;
-
+    const completed = kpis.filter(k => k.status === 'completed').length;
+    const warning = kpis.filter(k => k.status === 'warning').length;
+    const risk = kpis.filter(k => k.status === 'risk').length;
     const weighted = kpis.reduce(
       (acc, k) => {
-        const weight = k.weight || 0;
-        acc.totalWeight += weight;
-        acc.weightedScore += (k.completionRate * weight) / 100;
+        acc.totalWeight += k.weight || 0;
+        acc.weightedScore += (k.completionRate * (k.weight || 0)) / 100;
         return acc;
       },
       { weightedScore: 0, totalWeight: 0 },
     );
-
-    const overallScore =
-      weighted.totalWeight > 0
-        ? (weighted.weightedScore / weighted.totalWeight) * 100
-        : kpis.reduce((sum, k) => sum + k.completionRate, 0) / kpis.length;
-
+    const overallScore = weighted.totalWeight > 0
+      ? (weighted.weightedScore / weighted.totalWeight) * 100
+      : kpis.reduce((s, k) => s + k.completionRate, 0) / kpis.length;
     return {
       totalKPIs: kpis.length,
       overallScore: parseFloat(overallScore.toFixed(1)),
@@ -168,35 +144,73 @@ const Dashboard = () => {
     };
   }, [kpis]);
 
-  const overallStatus = stats ? getStatus(stats.overallScore) : null;
+  const overallStatus = stats ? getStatus(stats?.overallScore) : null;
 
   const categoryData = useMemo(() => {
     const map = {};
-    kpis.forEach((k) => {
-      const perspective = k.perspective;
-      const value = k.weight || 1;
-      map[perspective] = (map[perspective] || 0) + value;
+    kpis.forEach(k => {
+      map[k.bsc] = (map[k.bsc] || 0) + (k.weight || 1);
     });
-    return Object.entries(map).map(([perspective, weight]) => ({
-      name: perspective,
-      value: weight,
-      weight,
-      perspective,
+    return Object.entries(map).map(([name, weight]) => ({ name, value: weight, weight, perspective: name }));
+  }, [kpis]);
+
+  const bscBarData = useMemo(() => {
+    const order = ['Tài chính', 'Khách hàng', 'Quy trình nội bộ', 'Học hỏi & Phát triển'];
+    const groups = {};
+    kpis.forEach(k => {
+      if (!groups[k.bsc]) groups[k.bsc] = [];
+      groups[k.bsc].push(k.completionRate);
+    });
+    return order.filter(b => groups[b]).map(b => ({
+      name: SHORT_NAMES[b] || b,
+      fullName: b,
+      avg: groups[b].reduce((s, v) => s + v, 0) / groups[b].length,
+      count: groups[b].length,
     }));
   }, [kpis]);
 
-  const openEdit = (record) => {
-    if (!canManageKpis) return;
-    const kpi = rawKpis.find((k) => (k._id || k.id) === record.id);
-    if (!kpi) return;
-    setEditingKpi(kpi);
+  const monthlyTrend = useMemo(() => {
+    const months = Array.from({ length: 12 }, (_, i) => ({
+      month: `T${i + 1}`,
+      weightedScore: 0,
+      totalWeight: 0,
+    }));
+    kpis.forEach(kpi => {
+      const entries = allEntries[kpi.id] || [];
+      entries.forEach(e => {
+        const mIdx = (e.month ?? e.monthIndex ?? 1) - 1;
+        if (mIdx >= 0 && mIdx < 12 && e.actualValue != null && kpi.target > 0) {
+          const rate = calcCompletionRate(Number(e.actualValue), kpi.target);
+          months[mIdx].weightedScore += rate * (kpi.weight || 1);
+          months[mIdx].totalWeight += (kpi.weight || 1);
+        }
+      });
+    });
+    return months.map(m => ({
+      month: m.month,
+      score: m.totalWeight > 0 ? parseFloat((m.weightedScore / m.totalWeight).toFixed(1)) : null,
+    }));
+  }, [kpis, allEntries]);
+
+  const bscGroups = useMemo(() => {
+    const order = ['Tài chính', 'Khách hàng', 'Quy trình nội bộ', 'Học hỏi & Phát triển'];
+    const groups = {};
+    kpis.forEach(k => {
+      if (!groups[k.bsc]) groups[k.bsc] = [];
+      groups[k.bsc].push(k);
+    });
+    return order.filter(b => groups[b]).map(b => ({ bsc: b, rows: groups[b] }))
+      .concat(Object.keys(groups).filter(b => !order.includes(b)).map(b => ({ bsc: b, rows: groups[b] })));
+  }, [kpis]);
+
+  const openEdit = (row) => {
+    setEditingKpi(row);
     editForm.setFieldsValue({
-      title: kpi.title,
-      category: kpi.category,
-      targetValue: kpi.targetValue,
-      unit: kpi.unit,
-      targetDate: kpi.targetDate ? dayjs(kpi.targetDate) : null,
-      description: kpi.description,
+      name: row.name,
+      targetValue: row.target,
+      targetUnit: row.unit,
+      weight: row.weight,
+      bscCategoryId: rawKpis.find(k => k.id === row.id)?.bscCategoryId,
     });
     setEditOpen(true);
   };
@@ -205,46 +219,77 @@ const Dashboard = () => {
     try {
       const values = await editForm.validateFields();
       setSaving(true);
-      await companyKpiService.update(editingKpi._id || editingKpi.id, {
-        title: values.title,
-        category: values.category,
-        targetValue: values.targetValue,
-        unit: values.unit,
-        targetDate: values.targetDate?.toISOString(),
-        description: values.description,
-      });
+      const updated = await workshopKpiService.update(editingKpi.id, values);
+      setRawKpis(prev => prev.map(k => k.id === updated.id ? updated : k));
       message.success('Đã cập nhật KPI');
       setEditOpen(false);
       setEditingKpi(null);
-      fetchKPIs();
     } catch (err) {
-      if (!err?.errorFields) {
-        message.error('Cập nhật thất bại');
-      }
+      if (!err?.errorFields) message.error('Cập nhật thất bại');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = (id) => {
-    if (!canManageKpis) return;
+  const handleDelete = (row) => {
     modal.confirm({
       title: 'Xóa KPI?',
-      content: 'Bạn chắc chắn muốn xóa KPI này?',
+      content: `Bạn chắc chắn muốn xóa "${row.name}"?`,
       okText: 'Xóa',
-      cancelText: 'Hủy',
       okButtonProps: { danger: true },
+      cancelText: 'Hủy',
       onOk: async () => {
-        try {
-          await companyKpiService.remove(id);
-          message.success('Đã xóa KPI');
-          fetchKPIs();
-        } catch (err) {
-          message.error('Xóa KPI thất bại');
-        }
+        await workshopKpiService.remove(row.id);
+        setRawKpis(prev => prev.filter(k => k.id !== row.id));
+        message.success('Đã xóa KPI');
       },
     });
   };
+
+  const bscTableColumns = [
+    {
+      title: 'Tên KPI', dataIndex: 'name',
+      render: val => <span style={{ fontWeight: 500 }}>{val}</span>,
+    },
+    {
+      title: 'Mục tiêu', width: 110, align: 'center',
+      render: (_, row) => <span style={{ color: '#6b7280' }}>{row.target} {row.unit}</span>,
+    },
+    {
+      title: 'Thực tế', width: 90, align: 'center',
+      render: (_, row) => row.actual != null ? row.actual : <span style={{ color: '#6b7280' }}>—</span>,
+    },
+    {
+      title: 'Hoàn thành', width: 110, align: 'center',
+      render: (_, row) => {
+        const r = row.completionRate;
+        const color = r >= 85 ? '#16a34a' : r >= 70 ? '#d97706' : '#dc2626';
+        const bg = r >= 85 ? 'rgba(22,163,74,0.1)' : r >= 70 ? 'rgba(217,119,6,0.1)' : 'rgba(220,38,38,0.1)';
+        return (
+          <span style={{ display: 'inline-flex', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600, color, background: bg }}>
+            {r.toFixed(1)}%
+          </span>
+        );
+      },
+    },
+    {
+      title: 'Trạng thái', width: 110, align: 'center',
+      render: (_, row) => {
+        const label = getStatusLabel(row.status);
+        const color = getStatusColor(row.status);
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
+    ...(canManageKpis ? [{
+      title: '', width: 80, align: 'center',
+      render: (_, row) => (
+        <Space size={4}>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(row)} />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(row)} />
+        </Space>
+      ),
+    }] : []),
+  ];
 
   return (
     <div>
@@ -279,11 +324,12 @@ const Dashboard = () => {
           </Col>
           <Col>
             <Space>
+              <Select value={year} onChange={setYear} options={yearOptions} style={{ width: 100 }} />
               <Button icon={<ReloadOutlined />} onClick={fetchKPIs} loading={loading}>
                 Làm mới
               </Button>
-              {canManageKpis && (
-                <Button type="primary" onClick={() => navigate('/admin/kpis-bsc')}>
+              {isAdmin && (
+                <Button type="primary" onClick={() => navigate('/admin/workshop-kpis')}>
                   Quản lý KPI
                 </Button>
               )}
@@ -346,128 +392,91 @@ const Dashboard = () => {
         </Row>
       )}
 
-      {/* Pie Chart */}
+      {/* Charts Row */}
       {kpis.length > 0 && (
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          <Col xs={24} lg={12}>
-            <Card title="Phân bổ KPI theo góc độ" size="small">
-              <PerspectivePieChart kpis={categoryData} />
-            </Card>
-          </Col>
-          <Col xs={24} lg={12}>
-            <Card title="Hướng dẫn trạng thái" size="small" style={{ height: '100%' }}>
-              <div style={{ padding: '8px 0' }}>
-                <div style={{ marginBottom: 16 }}>
-                  <Text strong>Mô hình Balanced Scorecard (BSC)</Text>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: 13 }}>
-                    Hệ thống đánh giá KPI theo 4 góc độ chiến lược
+        <>
+          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+            <Col xs={24} lg={8}>
+              <Card title="Phân bổ trọng số BSC" size="small" style={{ height: '100%' }}>
+                <PerspectivePieChart kpis={categoryData} />
+              </Card>
+            </Col>
+            <Col xs={24} lg={16}>
+              <Card title="Hoàn thành trung bình theo góc độ BSC" size="small" style={{ height: '100%' }}>
+                <BscBarChart data={bscBarData} />
+              </Card>
+            </Col>
+          </Row>
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            <Col xs={24}>
+              <Card
+                title="Xu hướng điểm KPI theo tháng"
+                size="small"
+                extra={
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Điểm trung bình có trọng số — đường xanh: mục tiêu 85%
                   </Text>
-                </div>
-                <Divider style={{ margin: '12px 0' }} />
-                {[
-                  { color: '#1890ff', label: 'Tài chính', desc: 'Doanh thu, lợi nhuận, chi phí' },
-                  { color: '#52c41a', label: 'Khách hàng', desc: 'Hài lòng, giữ chân, tăng trưởng' },
-                  { color: '#faad14', label: 'Quy trình nội bộ', desc: 'Hiệu quả vận hành, chất lượng' },
-                  { color: '#722ed1', label: 'Học hỏi & Phát triển', desc: 'Nhân sự, đổi mới, tri thức' },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    style={{
-                      marginBottom: 10,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '50%',
-                        background: item.color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div>
-                      <Text strong style={{ fontSize: 13 }}>
-                        {item.label}
-                      </Text>
-                      <br />
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {item.desc}
-                      </Text>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </Col>
-        </Row>
+                }
+              >
+                <MonthlyTrendChart data={monthlyTrend} />
+              </Card>
+            </Col>
+          </Row>
+        </>
       )}
 
-      {/* KPI Table */}
-      <Card
-        title={
-          <Space>
-            <span>Bảng KPI BSC</span>
-            {stats && (
-              <Text type="secondary" style={{ fontWeight: 'normal', fontSize: 13 }}>
-                ({stats.totalKPIs} chỉ số)
-              </Text>
-            )}
-          </Space>
-        }
-        styles={{ body: { padding: 0 } }}
-      >
-        <KPITable
-          kpis={kpis}
-          loading={loading}
-          onEdit={canManageKpis ? openEdit : undefined}
-          onDelete={canManageKpis ? handleDelete : undefined}
-          showActions={canManageKpis}
-          categoryWeights={categoryWeights}
-        />
-      </Card>
-
+      {/* Edit KPI Modal (admin only) */}
       {canManageKpis && (
         <Modal
-          title="Chỉnh sửa KPI BSC"
+          title="Chỉnh sửa KPI"
           open={editOpen}
-          onCancel={() => {
-            setEditOpen(false);
-            setEditingKpi(null);
-          }}
+          onCancel={() => { setEditOpen(false); setEditingKpi(null); }}
           onOk={handleUpdate}
           okButtonProps={{ loading: saving }}
           destroyOnHide
         >
           <Form form={editForm} layout="vertical">
-            <Form.Item name="title" label="Tên KPI" rules={[{ required: true }]}>
+            <Form.Item name="name" label="Tên KPI" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
-            <Form.Item name="category" label="Góc độ BSC" rules={[{ required: true }]}>
-              <Select options={categories} />
-            </Form.Item>
-            <Form.Item
-              name="targetValue"
-              label="Giá trị mục tiêu"
-              rules={[{ required: true, type: 'number', min: 0 }]}
-            >
+            <Form.Item name="targetValue" label="Mục tiêu" rules={[{ required: true, type: 'number', min: 0 }]}>
               <InputNumber style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="unit" label="Đơn vị" rules={[{ required: true }]}>
-              <Input />
+            <Form.Item name="targetUnit" label="Đơn vị" rules={[{ required: true }]}>
+              <Input placeholder="VD: %, triệu đồng, lỗi" />
             </Form.Item>
-            <Form.Item name="targetDate" label="Hạn hoàn thành" rules={[{ required: true }]}>
-              <DatePicker style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item name="description" label="Mô tả" rules={[{ max: 300 }]}>
-              <Input.TextArea rows={3} />
+            <Form.Item name="weight" label="Trọng số (%)" rules={[{ type: 'number', min: 0, max: 100 }]}>
+              <InputNumber style={{ width: '100%' }} min={0} max={100} />
             </Form.Item>
           </Form>
         </Modal>
       )}
+
+      {/* BSC KPI Table grouped by category */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {bscGroups.length === 0 && !loading && (
+          <Card><Text type="secondary">Không có KPI nào trong năm {year}.</Text></Card>
+        )}
+        {bscGroups.map(({ bsc, rows }) => (
+          <Card
+            key={bsc}
+            size="small"
+            title={
+              <span style={{ color: bscColorMap[bsc] || '#1a1f2e', fontWeight: 600 }}>{bsc}</span>
+            }
+            styles={{ body: { padding: 0 } }}
+          >
+            <Table
+              columns={bscTableColumns}
+              dataSource={rows}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              loading={loading}
+            />
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };

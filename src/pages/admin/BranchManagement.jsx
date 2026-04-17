@@ -1,70 +1,35 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, Form, Input, Card, message, Divider, Tabs } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, HomeOutlined } from '@ant-design/icons';
-import { branchService } from '../../services/branchService';
-import { formatLog } from '../../utils/logFormatter';
+import { Table, Button, Space, Modal, Form, Input, Card, message } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import workshopKpiService from '../../services/workshopKpiService';
 
 const BranchManagement = () => {
-  const [branches, setBranches] = useState([]);
+  const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingBranch, setEditingBranch] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [form] = Form.useForm();
-
-  const generateBranchCode = () =>
-    `BR${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await branchService.getBranches();
-      setBranches(data);
-    } catch (err) {
-      console.error(formatLog('Load branches failed', err.message));
-      message.error('Tải chi nhánh thất bại');
+      const data = await workshopKpiService.listWorkshops();
+      setWorkshops(data);
+    } catch {
+      message.error('Tải danh sách phân xưởng thất bại');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const columns = [
+    { title: 'Tên phân xưởng', dataIndex: 'name', key: 'name' },
+    { title: 'Địa chỉ', dataIndex: 'address', key: 'address', render: t => t || '—' },
+    { title: 'Mô tả', dataIndex: 'description', key: 'description', render: t => t || '—' },
     {
-      title: 'Mã chi nhánh',
-      dataIndex: 'code',
-      key: 'code',
-      width: 100,
-    },
-    {
-      title: 'Tên chi nhánh',
-      dataIndex: 'name',
-      key: 'name',
-      render: (text) => (
-        <Space>
-          <HomeOutlined />
-          <span>{text}</span>
-        </Space>
-      ),
-    },
-    {
-      title: 'Địa chỉ',
-      dataIndex: 'address',
-      key: 'address',
-      render: (t) => t || '—',
-    },
-    {
-      title: 'Mô tả',
-      dataIndex: 'description',
-      key: 'description',
-      render: (t) => t || '—',
-    },
-    {
-      title: 'Hành động',
-      key: 'action',
-      width: 120,
+      title: 'Hành động', key: 'action', width: 120,
       render: (_, record) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
@@ -74,104 +39,89 @@ const BranchManagement = () => {
     },
   ];
 
-  const handleEdit = (branch) => {
-    setEditingBranch(branch);
-    form.setFieldsValue({
-      name: branch.name,
-      address: branch.address,
-      description: branch.description,
-    });
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    form.setFieldsValue({ name: item.name, address: item.address, description: item.description });
     setModalOpen(true);
   };
 
   const handleDelete = (id) => {
     Modal.confirm({
       title: 'Xác nhận xóa',
-      content: 'Bạn có chắc chắn muốn xóa chi nhánh này? Các phòng ban liên kết sẽ bị ảnh hưởng.',
-      onOk() {
-        branchService
-          .deleteBranch(id)
-          .then(() => {
-            setBranches(branches.filter((b) => b._id !== id && b.id !== id));
-            message.success('Xóa chi nhánh thành công');
-          })
-          .catch(() => message.error('Xóa chi nhánh thất bại'));
+      content: 'Bạn có chắc muốn xóa phân xưởng này?',
+      okText: 'Xóa',
+      okButtonProps: { danger: true },
+      cancelText: 'Hủy',
+      onOk: async () => {
+        try {
+          await workshopKpiService.removeWorkshop(id);
+          setWorkshops(prev => prev.filter(w => w.id !== id));
+          message.success('Đã xóa phân xưởng');
+        } catch {
+          message.error('Xóa phân xưởng thất bại');
+        }
       },
     });
   };
 
   const handleSubmit = async (values) => {
     try {
-      const payload = editingBranch
-        ? values
-        : { ...values, code: generateBranchCode() };
-
-      if (editingBranch) {
-        const updated = await branchService.updateBranch(editingBranch._id || editingBranch.id, payload);
-        setBranches(branches.map((b) => (b._id === updated._id ? updated : b)));
-        message.success('Cập nhật chi nhánh thành công');
+      if (editingItem) {
+        const updated = await workshopKpiService.updateWorkshop(editingItem.id, values);
+        setWorkshops(prev => prev.map(w => w.id === updated.id ? updated : w));
+        message.success('Cập nhật phân xưởng thành công');
       } else {
-        const created = await branchService.createBranch(payload);
-        setBranches([...branches, created]);
-        message.success('Thêm chi nhánh thành công');
+        const created = await workshopKpiService.createWorkshop(values);
+        setWorkshops(prev => [...prev, created]);
+        message.success('Thêm phân xưởng thành công');
       }
       setModalOpen(false);
       form.resetFields();
-      setEditingBranch(null);
+      setEditingItem(null);
     } catch (err) {
-      message.error(err.message || 'Lưu chi nhánh thất bại');
+      message.error(err.message || 'Lưu phân xưởng thất bại');
     }
   };
 
   return (
     <Card
-      title="Quản lý Chi nhánh (Phân xưởng)"
+      title="Quản lý Phân xưởng"
       extra={
         <Space>
           <Button icon={<ReloadOutlined />} onClick={loadData} />
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => {
-              setEditingBranch(null);
-              form.resetFields();
-              setModalOpen(true);
-            }}
+            onClick={() => { setEditingItem(null); form.resetFields(); setModalOpen(true); }}
           >
-            Thêm chi nhánh
+            Thêm phân xưởng
           </Button>
         </Space>
       }
     >
       <Table
         columns={columns}
-        dataSource={branches}
-        rowKey={(r) => r._id || r.id}
+        dataSource={workshops}
+        rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
       />
       <Modal
-        title={editingBranch ? 'Chỉnh sửa chi nhánh' : 'Thêm chi nhánh'}
+        title={editingItem ? 'Chỉnh sửa phân xưởng' : 'Thêm phân xưởng'}
         open={modalOpen}
-        onCancel={() => {
-          setModalOpen(false);
-          form.resetFields();
-        }}
+        onCancel={() => { setModalOpen(false); form.resetFields(); }}
         onOk={() => form.submit()}
+        destroyOnHide
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item
-            name="name"
-            label="Tên chi nhánh"
-            rules={[{ required: true, message: 'Vui lòng nhập tên chi nhánh' }]}
-          >
-            <Input placeholder="VD: Phân xưởng A, Phân xưởng B" />
+          <Form.Item name="name" label="Tên phân xưởng" rules={[{ required: true }]}>
+            <Input placeholder="VD: Phân xưởng A" />
           </Form.Item>
           <Form.Item name="address" label="Địa chỉ">
-            <Input.TextArea placeholder="Nhập địa chỉ chi nhánh" rows={2} />
+            <Input.TextArea rows={2} placeholder="Nhập địa chỉ" />
           </Form.Item>
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea placeholder="Mô tả ngắn về chi nhánh" rows={3} />
+            <Input.TextArea rows={3} placeholder="Mô tả ngắn về phân xưởng" />
           </Form.Item>
         </Form>
       </Modal>

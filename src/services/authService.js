@@ -7,24 +7,13 @@ const authAxios = axios.create({
 });
 
 export const authService = {
-  async login(identifier, password) {
+  async login(username, password) {
     try {
-      const res = await authAxios.post('/auth/login', { identifier, password });
+      const res = await authAxios.post('/auth/login', { username, password });
       return res.data;
     } catch (err) {
       const message =
         err.response?.data?.message || err.message || 'Đăng nhập thất bại';
-      throw new Error(Array.isArray(message) ? message.join(', ') : message);
-    }
-  },
-
-  async refresh(refreshToken) {
-    try {
-      const res = await authAxios.post('/auth/refresh', { refreshToken });
-      return res.data;
-    } catch (err) {
-      const message =
-        err.response?.data?.message || err.message || 'Refresh token failed';
       throw new Error(Array.isArray(message) ? message.join(', ') : message);
     }
   },

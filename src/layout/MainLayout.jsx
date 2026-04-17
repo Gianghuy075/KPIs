@@ -11,9 +11,7 @@ import {
   MenuUnfoldOutlined,
   TeamOutlined,
   FileTextOutlined,
-  CalendarOutlined,
   CheckOutlined,
-  PercentageOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,23 +22,15 @@ const { Title } = Typography;
 
 const breadcrumbMap = {
   '/dashboard': 'Dashboard KPI',
-  '/admin/users': 'Quản lý Người dùng',
-  '/admin/branches': 'Quản lý Chi nhánh',
-  // Phòng ban đã ẩn
-  '/admin/kpi-management': 'Quản lý KPI Phòng ban',
-  '/admin/kpis-bsc': 'KPI BSC (Công ty)',
-  '/admin/bsc-weights': 'Trọng số Góc độ BSC',
+  '/admin/employee': 'Quản lý Nhân viên',
+  '/admin/branches': 'Quản lý Phân xưởng',
+  '/admin/workshop-kpis': 'KPI Phân xưởng',
+  '/admin/workshop-kpi-view': 'Xem KPI theo phân xưởng',
+  '/admin/bonus-configs': 'Cấu hình thưởng',
   '/admin/notifications': 'Quản lý Thông báo',
-  '/admin/monthly-work': 'Quản lý Công việc Hàng tháng',
-  '/admin/quarterly-work': 'Quản lý Công việc Hàng quý',
-  '/admin/yearly-work': 'Quản lý Công việc Hàng năm',
   '/admin/penalty-rules': 'Quản lý Quy tắc Trừ điểm KPI',
-  '/admin/penalty-rules-bsc': 'Quản lý Quy tắc Trừ điểm theo BSC',
-  '/admin/daily-work': 'Quản lý Công việc Hàng ngày',
-  '/admin/daily-evaluation': 'Quản lý Đánh giá Hàng ngày',
-  '/admin/monthly-evaluation': 'Quản lý Đánh giá Hàng tháng',
-  '/admin/yearly-evaluation': 'Quản lý Đánh giá Hàng năm',
-  '/branch/kpis': 'KPI Phân xưởng',
+  '/branch/data-entry': 'Nhập dữ liệu KPI',
+  '/branch/monthly-scores': 'Điểm KPI tháng',
   '/me/kpis': 'KPI của tôi',
 };
 
@@ -61,7 +51,7 @@ const MainLayout = ({ children }) => {
     ];
 
     // Thêm menu items cho Quản lý cấp cao
-    if (user?.role === 'senior_manager') {
+    if (user?.role === 'system_admin') {
       baseItems.push(
         {
           key: 'management',
@@ -69,34 +59,24 @@ const MainLayout = ({ children }) => {
           label: 'Quản lý Hệ thống',
           children: [
             {
-              key: '/admin/kpis-bsc',
+              key: '/admin/workshop-kpis',
               icon: <BarChartOutlined />,
-              label: 'KPI BSC (Công ty)',
+              label: 'KPI Phân xưởng',
             },
             {
-              key: '/admin/bsc-weights',
-              icon: <PercentageOutlined />,
-              label: 'Trọng số BSC',
+              key: '/admin/workshop-kpi-view',
+              icon: <BarChartOutlined />,
+              label: 'Xem KPI theo phân xưởng',
+            },
+            {
+              key: '/admin/bonus-configs',
+              icon: <TrophyOutlined />,
+              label: 'Cấu hình thưởng',
             },
             {
               key: '/admin/notifications',
               icon: <CheckOutlined />,
               label: 'Quản lý Thông báo',
-            },
-            {
-              key: '/admin/monthly-work',
-              icon: <CalendarOutlined />,
-              label: 'Công việc Hàng tháng',
-            },
-            {
-              key: '/admin/quarterly-work',
-              icon: <FileTextOutlined />,
-              label: 'Công việc Hàng quý',
-            },
-            {
-              key: '/admin/yearly-work',
-              icon: <FileTextOutlined />,
-              label: 'Công việc Hàng năm',
             },
           ],
         },     
@@ -109,31 +89,6 @@ const MainLayout = ({ children }) => {
               key: '/admin/penalty-rules',
               icon: <FileTextOutlined />,
               label: 'Quy tắc Trừ điểm KPI',
-            },
-            {
-              key: '/admin/penalty-rules-bsc',
-              icon: <FileTextOutlined />,
-              label: 'Quy tắc Trừ điểm BSC',
-            },
-            {
-              key: '/admin/daily-work',
-              icon: <CalendarOutlined />,
-              label: 'Công việc Hàng ngày',
-            },
-            {
-              key: '/admin/daily-evaluation',
-              icon: <CheckOutlined />,
-              label: 'Đánh giá Hàng ngày',
-            },
-            {
-              key: '/admin/monthly-evaluation',
-              icon: <CheckOutlined />,
-              label: 'Đánh giá Hàng tháng',
-            },
-            {
-              key: '/admin/yearly-evaluation',
-              icon: <CheckOutlined />,
-              label: 'Đánh giá Hàng năm',
             },
           ],
         },
@@ -157,12 +112,19 @@ const MainLayout = ({ children }) => {
       );
     }
 
-    if (user?.role === 'branch_manager') {
-      baseItems.push({
-        key: '/branch/kpis',
-        icon: <BarChartOutlined />,
-        label: 'KPI Phân xưởng',
-      });
+    if (user?.role === 'workshop_manager') {
+      baseItems.push(
+        {
+          key: '/branch/data-entry',
+          icon: <FileTextOutlined />,
+          label: 'Nhập dữ liệu KPI',
+        },
+        {
+          key: '/branch/monthly-scores',
+          icon: <BarChartOutlined />,
+          label: 'Điểm KPI tháng',
+        },
+      );
     }
 
     if (user?.role === 'employee') {

@@ -1,23 +1,9 @@
 import { apiClient } from './apiClient';
 
 export const userService = {
-  async getUsers() {
-    const res = await apiClient.get('/users');
-    return res.data ?? res;
-  },
-
-  async createUser(payload) {
-    const res = await apiClient.post('/users', payload);
-    return res.data ?? res;
-  },
-
-  async updateUser(id, payload) {
-    const res = await apiClient.patch(`/users/${id}`, payload);
-    return res.data ?? res;
-  },
-
-  async deleteUser(id) {
-    const res = await apiClient.delete(`/users/${id}`);
-    return res.data ?? res;
-  },
+  getUsers: () => apiClient.get('/users').then(r => r.data),
+  createUser: (payload) => apiClient.post('/users', payload).then(r => r.data),
+  updateUser: (id, payload) => apiClient.patch(`/users/${id}`, payload).then(r => r.data),
+  deactivateUser: (id) => apiClient.patch(`/users/${id}/deactivate`).then(r => r.data),
+  activateUser: (id) => apiClient.patch(`/users/${id}`, { isActive: true }).then(r => r.data),
 };
