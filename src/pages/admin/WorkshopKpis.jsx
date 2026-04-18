@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Select, Button, Space, Modal, Spin, message, Card } from 'antd';
+import {
+  Select, Button, Space, Modal, Spin, message, Card,
+  Form, Input, InputNumber, App as AntApp,
+} from 'antd';
 import { PlusOutlined, BarChartOutlined } from '@ant-design/icons';
-import WorkshopKpiTable from '../../features/workshop-kpi/WorkshopKpiTable';
 import WorkshopKpiCreateForm from '../../features/workshop-kpi/WorkshopKpiCreateForm';
 import PeriodTargetEditor from '../../features/workshop-kpi/PeriodTargetEditor';
+import KpiSystemTable from '../../components/KpiSystemTable';
 import workshopKpiService from '../../services/workshopKpiService';
 import penaltyService from '../../services/penaltyService';
 
@@ -11,6 +14,7 @@ const currentYear = new Date().getFullYear();
 const years = [currentYear, currentYear - 1, currentYear + 1];
 
 const WorkshopKpis = () => {
+  const { modal } = AntApp.useApp();
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedWorkshopId, setSelectedWorkshopId] = useState(null);
 
@@ -18,12 +22,17 @@ const WorkshopKpis = () => {
   const [workshops, setWorkshops] = useState([]);
   const [bscCategories, setBscCategories] = useState([]);
   const [penaltyLogics, setPenaltyLogics] = useState([]);
+  const [allEntries, setAllEntries] = useState({});
 
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [loadingKpis, setLoadingKpis] = useState(false);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingKpi, setEditingKpi] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [editForm] = Form.useForm();
 
   useEffect(() => {
     Promise.all([
@@ -43,7 +52,19 @@ const WorkshopKpis = () => {
     if (!selectedWorkshopId || !selectedYear) return;
     setLoadingKpis(true);
     workshopKpiService.list({ year: selectedYear, phanXuongId: selectedWorkshopId })
-      .then(setKpis)
+      .then(async (kpiList) => {
+        setKpis(kpiList);
+        const entriesMap = {};
+        await Promise.all(kpiList.map(async (kpi) => {
+          try {
+            const entries = await workshopKpiService.getMonthlyEntries(kpi.id);
+            entriesMap[kpi.id] = entries;
+          } catch {
+            entriesMap[kpi.id] = [];
+          }
+        }));
+        setAllEntries(entriesMap);
+      })
       .catch(() => message.error('Không thể tải danh sách KPI'))
       .finally(() => setLoadingKpis(false));
   }, [selectedWorkshopId, selectedYear]);
@@ -54,24 +75,46 @@ const WorkshopKpis = () => {
     return map;
   }, [bscCategories]);
 
-  const groupedKpis = useMemo(() => {
-    const groups = {};
-    kpis.forEach(kpi => {
-      const catName = bscCategoryMap[kpi.bscCategoryId] || 'Khác';
-      if (!groups[catName]) groups[catName] = [];
-      groups[catName].push(kpi);
+  const openEdit = (row) => {
+    setEditingKpi(row);
+    editForm.setFieldsValue({
+      name: row.name,
+      targetValue: row.targetValue,
+      targetUnit: row.targetUnit,
+      weight: row.weight,
     });
-    return groups;
-  }, [kpis, bscCategoryMap]);
+    setEditOpen(true);
+  };
 
-  const handleUpdate = async (id, values) => {
+  const handleUpdate = async () => {
     try {
-      const updated = await workshopKpiService.update(id, values);
-      setKpis(prev => prev.map(k => k.id === id ? { ...k, ...updated } : k));
+      const values = await editForm.validateFields();
+      setSaving(true);
+      const updated = await workshopKpiService.update(editingKpi.id, values);
+      setKpis(prev => prev.map(k => k.id === updated.id ? { ...k, ...updated } : k));
       message.success('Đã cập nhật KPI');
-    } catch {
-      message.error('Cập nhật thất bại');
+      setEditOpen(false);
+      setEditingKpi(null);
+    } catch (err) {
+      if (!err?.errorFields) message.error('Cập nhật thất bại');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleDelete = (row) => {
+    modal.confirm({
+      title: 'Xóa KPI?',
+      content: `Bạn chắc chắn muốn xóa "${row.name}"?`,
+      okText: 'Xóa',
+      okButtonProps: { danger: true },
+      cancelText: 'Hủy',
+      onOk: async () => {
+        await workshopKpiService.remove(row.id);
+        setKpis(prev => prev.filter(k => k.id !== row.id));
+        message.success('Đã xóa KPI');
+      },
+    });
   };
 
   const handleCreateKpi = async (payload, workshopIds, year) => {
@@ -114,21 +157,41 @@ const WorkshopKpis = () => {
         </div>
       </Card>
 
-      {loadingKpis ? (
-        <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>
-      ) : (
-        Object.entries(groupedKpis).map(([catName, catKpis]) => (
-          <WorkshopKpiTable key={catName} title={catName} items={catKpis} onUpdate={handleUpdate} />
-        ))
-      )}
+      <KpiSystemTable
+        kpis={kpis}
+        allEntries={allEntries}
+        bscCategoryMap={bscCategoryMap}
+        penaltyLogics={penaltyLogics}
+        canManage
+        onEdit={openEdit}
+        onDelete={handleDelete}
+        loading={loadingKpis}
+      />
 
-      {!loadingKpis && kpis.length === 0 && selectedWorkshopId && (
-        <Card>
-          <div style={{ textAlign: 'center', padding: 32, color: '#6b7280' }}>
-            Chưa có KPI nào cho phân xưởng này. Nhấn "Thêm KPI" để bắt đầu.
-          </div>
-        </Card>
-      )}
+      {/* Edit KPI Modal */}
+      <Modal
+        title="Chỉnh sửa KPI"
+        open={editOpen}
+        onCancel={() => { setEditOpen(false); setEditingKpi(null); }}
+        onOk={handleUpdate}
+        okButtonProps={{ loading: saving }}
+        destroyOnHide
+      >
+        <Form form={editForm} layout="vertical">
+          <Form.Item name="name" label="Tên KPI" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="targetValue" label="Mục tiêu" rules={[{ required: true, type: 'number', min: 0 }]}>
+            <InputNumber style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="targetUnit" label="Đơn vị" rules={[{ required: true }]}>
+            <Input placeholder="VD: %, triệu đồng, lỗi" />
+          </Form.Item>
+          <Form.Item name="weight" label="Trọng số (%)" rules={[{ type: 'number', min: 0, max: 100 }]}>
+            <InputNumber style={{ width: '100%' }} min={0} max={100} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title="Thêm KPI mới"

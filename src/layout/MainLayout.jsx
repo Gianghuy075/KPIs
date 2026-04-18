@@ -26,6 +26,8 @@ const breadcrumbMap = {
   '/admin/branches': 'Quản lý Phân xưởng',
   '/admin/workshop-kpis': 'KPI Phân xưởng',
   '/admin/workshop-kpi-view': 'Xem KPI theo phân xưởng',
+  '/admin/monthly-scores-view': 'Điểm KPI tháng theo phân xưởng',
+  '/branch/kpi-view': 'Chi tiết KPI',
   '/admin/bonus-configs': 'Cấu hình thưởng',
   '/admin/notifications': 'Quản lý Thông báo',
   '/admin/penalty-rules': 'Quản lý Quy tắc Trừ điểm KPI',
@@ -67,6 +69,11 @@ const MainLayout = ({ children }) => {
               key: '/admin/workshop-kpi-view',
               icon: <BarChartOutlined />,
               label: 'Xem KPI theo phân xưởng',
+            },
+            {
+              key: '/admin/monthly-scores-view',
+              icon: <BarChartOutlined />,
+              label: 'Điểm KPI tháng',
             },
             {
               key: '/admin/bonus-configs',
@@ -118,6 +125,11 @@ const MainLayout = ({ children }) => {
           key: '/branch/data-entry',
           icon: <FileTextOutlined />,
           label: 'Nhập dữ liệu KPI',
+        },
+        {
+          key: '/branch/kpi-view',
+          icon: <BarChartOutlined />,
+          label: 'Chi tiết KPI',
         },
         {
           key: '/branch/monthly-scores',

@@ -23,6 +23,8 @@ export default {
   updateMonthlyEntry: (kpiId, month, payload) =>
     apiClient.patch(`/kpis/${kpiId}/monthly-entries/${month}`, payload).then(r => r.data),
 
+  listDailyEntries: (kpiId, from, to) =>
+    apiClient.get(`/kpis/${kpiId}/daily-entries`, { params: { from, to } }).then(r => r.data),
   getDailyEntry: (kpiId, date) =>
     apiClient.get(`/kpis/${kpiId}/daily-entries/${date}`).then(r => r.data),
   updateDailyEntry: (kpiId, date, payload) =>

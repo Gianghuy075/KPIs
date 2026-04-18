@@ -13,6 +13,8 @@ import KPIPenaltyRules from '../pages/admin/KPIPenaltyRules';
 import WorkshopKpis from '../pages/admin/WorkshopKpis';
 import BonusConfigs from '../pages/admin/BonusConfigs';
 import WorkshopKpiView from '../pages/admin/WorkshopKpiView';
+import AdminMonthlyScores from '../pages/admin/AdminMonthlyScores';
+import BranchKpiView from '../pages/branch/BranchKpiView';
 
 const AppRouter = () => {
   const { user, initialized } = useAuth();
@@ -43,12 +45,14 @@ const AppRouter = () => {
               <Route path="/admin/workshop-kpi-view" element={<WorkshopKpiView />} />
               <Route path="/admin/bonus-configs" element={<BonusConfigs />} />
               <Route path="/admin/penalty-rules" element={<KPIPenaltyRules />} />
+              <Route path="/admin/monthly-scores-view" element={<AdminMonthlyScores />} />
             </>
           )}
           {user?.role === 'workshop_manager' && (
             <>
               <Route path="/branch/data-entry" element={<WorkshopDataEntry />} />
               <Route path="/branch/monthly-scores" element={<MonthlyScores />} />
+              <Route path="/branch/kpi-view" element={<BranchKpiView />} />
             </>
           )}
           {user?.role === 'employee' && (

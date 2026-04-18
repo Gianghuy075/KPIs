@@ -1,5 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Select, Card, InputNumber, Slider, Button, Table, Space, Spin, message, Row, Col, Statistic } from 'antd';
+import {
+  Select,
+  Card,
+  InputNumber,
+  Slider,
+  Button,
+  Table,
+  Space,
+  Spin,
+  message,
+  Row,
+  Col,
+  Statistic,
+  Input,
+} from 'antd';
 import { Save, Award } from 'lucide-react';
 import workshopKpiService from '../../services/workshopKpiService';
 import bonusConfigService from '../../services/bonusConfigService';
@@ -9,6 +23,7 @@ const COLORS = {
   warning: '#d97706',
   danger: '#dc2626',
   primary: '#3b5fc4',
+  primaryBg: 'rgba(59,95,196,0.08)',
   muted: '#6b7280',
   foreground: '#1a1f2e',
   card: '#ffffff',
@@ -19,6 +34,26 @@ const currentYear = new Date().getFullYear();
 const years = [currentYear, currentYear - 1, currentYear + 1];
 
 const defaultConfig = () => ({ deptCoefficient: 1.0, individualRatio: 70, kpiWeightOverrides: {} });
+
+const bscColorMap = {
+  'Tài chính': { color: '#1d4ed8', background: 'rgba(59,130,246,0.1)' },
+  'Khách hàng': { color: '#15803d', background: 'rgba(16,185,129,0.1)' },
+  'Quy trình nội bộ': { color: '#b45309', background: 'rgba(245,158,11,0.1)' },
+  'Học hỏi & Phát triển': { color: '#7c3aed', background: 'rgba(168,85,247,0.1)' },
+};
+
+const normalizeWeight = (value) => {
+  const num = Number(value);
+  if (Number.isNaN(num)) return null;
+  return Math.max(0, Math.min(100, Math.round(num * 100) / 100));
+};
+
+const isSameWeight = (a, b) => Math.abs(Number(a || 0) - Number(b || 0)) < 0.0001;
+
+const formatWeight = (value) => {
+  const num = Number(value || 0);
+  return Number.isInteger(num) ? String(num) : num.toFixed(2).replace(/\.?0+$/, '');
+};
 
 const BonusConfigManager = () => {
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
@@ -59,8 +94,12 @@ const BonusConfigManager = () => {
       if (cfgList.length) {
         const cfg = cfgList[0];
         const overrides = {};
-        (cfg.weightOverrides || []).forEach(o => { overrides[o.kpiId] = o.customWeight; });
-        setLocalConfig({ deptCoefficient: cfg.deptCoefficient ?? 1, individualRatio: cfg.individualRatio ?? 70, kpiWeightOverrides: overrides });
+        (cfg.weightOverrides || []).forEach(o => { overrides[o.kpiId] = Number(o.customWeight); });
+        setLocalConfig({
+          deptCoefficient: Number(cfg.deptCoefficient ?? 1),
+          individualRatio: Number(cfg.individualRatio ?? 70),
+          kpiWeightOverrides: overrides,
+        });
       } else {
         setLocalConfig(defaultConfig());
       }
@@ -73,6 +112,50 @@ const BonusConfigManager = () => {
     bscCategories.forEach(c => { map[c.id] = c.name; });
     return map;
   }, [bscCategories]);
+
+  const baseWeightMap = useMemo(
+    () => Object.fromEntries(kpis.map(kpi => [kpi.id, Number(kpi.weight || 0)])),
+    [kpis],
+  );
+
+  const totalOriginalWeight = useMemo(
+    () => kpis.reduce((sum, kpi) => sum + Number(kpi.weight || 0), 0),
+    [kpis],
+  );
+
+  const totalCustomWeight = useMemo(
+    () =>
+      kpis.reduce(
+        (sum, kpi) =>
+          sum +
+          Number(
+            localConfig.kpiWeightOverrides[kpi.id] !== undefined
+              ? localConfig.kpiWeightOverrides[kpi.id]
+              : kpi.weight || 0,
+          ),
+        0,
+      ),
+    [kpis, localConfig.kpiWeightOverrides],
+  );
+
+  const updateCustomWeight = (kpiId, rawValue) => {
+    setLocalConfig(prev => {
+      const overrides = { ...prev.kpiWeightOverrides };
+      const baseWeight = baseWeightMap[kpiId] ?? 0;
+      if (rawValue === '') {
+        delete overrides[kpiId];
+        return { ...prev, kpiWeightOverrides: overrides };
+      }
+
+      const normalized = normalizeWeight(rawValue);
+      if (normalized == null || isSameWeight(normalized, baseWeight)) {
+        delete overrides[kpiId];
+      } else {
+        overrides[kpiId] = normalized;
+      }
+      return { ...prev, kpiWeightOverrides: overrides };
+    });
+  };
 
   const handleSave = async () => {
     if (!selectedWorkshopId) return;
@@ -94,11 +177,17 @@ const BonusConfigManager = () => {
       }
 
       const overrides = Object.entries(localConfig.kpiWeightOverrides)
-        .filter(([, w]) => w != null)
-        .map(([kpiId, customWeight]) => ({ kpiId, customWeight }));
-      if (overrides.length) {
-        await bonusConfigService.saveWeightOverrides(savedConfig.id, overrides);
-      }
+        .map(([kpiId, customWeight]) => ({
+          kpiId,
+          customWeight: normalizeWeight(customWeight),
+        }))
+        .filter(
+          row =>
+            row.customWeight != null &&
+            !isSameWeight(row.customWeight, baseWeightMap[row.kpiId]),
+        );
+
+      await bonusConfigService.saveWeightOverrides(savedConfig.id, { overrides });
 
       message.success('Đã lưu cấu hình thưởng');
     } catch {
@@ -111,37 +200,138 @@ const BonusConfigManager = () => {
   const yearOptions = years.map(y => ({ value: String(y), label: String(y) }));
   const workshopOptions = workshops.map(w => ({ value: w.id, label: w.name }));
 
-  const kpiColumns = [
+  const kpiWeightColumns = [
     {
-      title: 'Tên KPI', dataIndex: 'name',
-      render: (val, row) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{val}</div>
-          <div style={{ fontSize: 12, color: COLORS.muted }}>{bscCategoryMap[row.bscCategoryId]}</div>
-        </div>
+      title: 'BSC',
+      key: 'bsc',
+      width: 140,
+      render: (_, kpi) => {
+        const bscName = bscCategoryMap[kpi.bscCategoryId] || 'Khác';
+        const style = bscColorMap[bscName] || { color: COLORS.muted, background: '#f3f4f6' };
+        return (
+          <span
+            style={{
+              ...style,
+              display: 'inline-flex',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {bscName}
+          </span>
+        );
+      },
+    },
+    {
+      title: 'Tên KPI',
+      key: 'name',
+      render: (_, kpi) => <span style={{ fontWeight: 500, color: COLORS.foreground }}>{kpi.name}</span>,
+    },
+    {
+      title: 'Mục tiêu',
+      key: 'target',
+      align: 'center',
+      render: (_, kpi) => (
+        <span style={{ fontSize: 14, color: COLORS.muted }}>
+          {kpi.targetValue} {kpi.targetUnit}
+        </span>
       ),
     },
     {
-      title: 'Trọng số gốc', dataIndex: 'weight', width: 120, align: 'center',
-      render: val => <span style={{ fontWeight: 500 }}>{val}%</span>,
+      title: 'Trọng số gốc',
+      key: 'weight',
+      align: 'center',
+      render: (_, kpi) => <span style={{ fontWeight: 700 }}>{formatWeight(kpi.weight)}%</span>,
     },
     {
-      title: 'Trọng số tùy chỉnh', width: 160, align: 'center',
+      title: 'Trọng số PB',
+      key: 'customWeight',
+      align: 'center',
       render: (_, row) => (
-        <InputNumber
-          min={0} max={100}
-          value={localConfig.kpiWeightOverrides[row.id] ?? null}
-          placeholder={String(row.weight)}
-          onChange={v => setLocalConfig(prev => ({
-            ...prev,
-            kpiWeightOverrides: { ...prev.kpiWeightOverrides, [row.id]: v },
-          }))}
-          style={{ width: '100%' }}
-          size="small"
-        />
+        (() => {
+          const baseWeight = Number(row.weight || 0);
+          const customWeight = localConfig.kpiWeightOverrides[row.id];
+          const isCustom = customWeight !== undefined && !isSameWeight(customWeight, baseWeight);
+
+          return (
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              placeholder={formatWeight(baseWeight)}
+              value={isCustom ? String(customWeight) : ''}
+              onChange={(e) => updateCustomWeight(row.id, e.target.value)}
+              style={{
+                width: 80,
+                textAlign: 'center',
+                fontWeight: 700,
+                borderColor: isCustom ? COLORS.primary : undefined,
+                background: isCustom ? COLORS.primaryBg : undefined,
+              }}
+            />
+          );
+        })()
       ),
     },
   ];
+
+  const kpiWeightData = useMemo(
+    () => [
+      ...kpis,
+      {
+        id: '__total__',
+        _isTotal: true,
+      },
+    ],
+    [kpis],
+  );
+
+  const kpiWeightColumnsWithTotal = kpiWeightColumns.map((col, index) => ({
+    ...col,
+    render: (value, record) => {
+      if (record._isTotal) {
+        if (index === 0) {
+          return {
+            children: (
+              <span style={{ fontWeight: 700, fontSize: 14, textTransform: 'uppercase' }}>
+                Tổng trọng số:
+              </span>
+            ),
+            props: { colSpan: 3, style: { textAlign: 'right' } },
+          };
+        }
+        if (index === 1 || index === 2) return { props: { colSpan: 0 } };
+        if (index === 3) {
+          return (
+            <span style={{ fontWeight: 700, textAlign: 'center', display: 'block' }}>
+              {formatWeight(totalOriginalWeight)}%
+            </span>
+          );
+        }
+        if (index === 4) {
+          return (
+            <span
+              style={{
+                fontWeight: 900,
+                fontSize: 18,
+                color: isSameWeight(totalCustomWeight, 100) ? COLORS.success : COLORS.danger,
+                display: 'block',
+                textAlign: 'center',
+              }}
+            >
+              {formatWeight(totalCustomWeight)}%
+            </span>
+          );
+        }
+      }
+
+      if (typeof col.render === 'function') return col.render(value, record);
+      return value;
+    },
+  }));
 
   if (loadingMeta) return <div style={{ textAlign: 'center', padding: 64 }}><Spin size="large" /></div>;
 
@@ -191,8 +381,18 @@ const BonusConfigManager = () => {
           </Row>
 
           {kpis.length > 0 && (
-            <Card title="Trọng số KPI tùy chỉnh" extra={<span style={{ fontSize: 12, color: COLORS.muted }}>Để trống = dùng trọng số gốc</span>}>
-              <Table columns={kpiColumns} dataSource={kpis} rowKey="id" pagination={false} size="small" />
+            <Card
+              title="Trọng số KPI tùy chỉnh"
+              extra={<span style={{ fontSize: 12, color: COLORS.muted }}>Để trống hoặc bằng trọng số gốc = dùng mặc định</span>}
+            >
+              <Table
+                columns={kpiWeightColumnsWithTotal}
+                dataSource={kpiWeightData}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                rowClassName={(record) => (record._isTotal ? 'ant-table-summary' : '')}
+              />
             </Card>
           )}
 

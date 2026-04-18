@@ -7,8 +7,6 @@ import {
   Space,
   Typography,
   Alert,
-  Table,
-  Tag,
   Select,
   Modal,
   Form,
@@ -16,10 +14,12 @@ import {
   InputNumber,
   App as AntApp,
 } from 'antd';
-import { ReloadOutlined, TrophyOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { ReloadOutlined, TrophyOutlined } from '@ant-design/icons';
+import KpiSystemTable from '../components/KpiSystemTable';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import workshopKpiService from '../services/workshopKpiService';
+import penaltyService from '../services/penaltyService';
 import StatisticsCard from '../components/StatisticsCard';
 import PerspectivePieChart from '../components/Charts/PerspectivePieChart';
 import BscBarChart, { SHORT_NAMES } from '../components/Charts/BscBarChart';
@@ -47,6 +47,7 @@ const Dashboard = () => {
   const [year, setYear] = useState(currentYear);
   const [rawKpis, setRawKpis] = useState([]);
   const [bscCategories, setBscCategories] = useState([]);
+  const [penaltyLogics, setPenaltyLogics] = useState([]);
   const [allEntries, setAllEntries] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -60,7 +61,13 @@ const Dashboard = () => {
   const phanXuongId = user?.phanXuongId;
 
   useEffect(() => {
-    workshopKpiService.listBscCategories().then(setBscCategories).catch(() => {});
+    Promise.all([
+      workshopKpiService.listBscCategories(),
+      penaltyService.list(),
+    ]).then(([bsc, pl]) => {
+      setBscCategories(bsc);
+      setPenaltyLogics(pl);
+    }).catch(() => {});
   }, []);
 
   const fetchKPIs = async () => {
@@ -192,25 +199,14 @@ const Dashboard = () => {
     }));
   }, [kpis, allEntries]);
 
-  const bscGroups = useMemo(() => {
-    const order = ['Tài chính', 'Khách hàng', 'Quy trình nội bộ', 'Học hỏi & Phát triển'];
-    const groups = {};
-    kpis.forEach(k => {
-      if (!groups[k.bsc]) groups[k.bsc] = [];
-      groups[k.bsc].push(k);
-    });
-    return order.filter(b => groups[b]).map(b => ({ bsc: b, rows: groups[b] }))
-      .concat(Object.keys(groups).filter(b => !order.includes(b)).map(b => ({ bsc: b, rows: groups[b] })));
-  }, [kpis]);
-
   const openEdit = (row) => {
     setEditingKpi(row);
     editForm.setFieldsValue({
       name: row.name,
-      targetValue: row.target,
-      targetUnit: row.unit,
+      targetValue: row.targetValue,
+      targetUnit: row.targetUnit,
       weight: row.weight,
-      bscCategoryId: rawKpis.find(k => k.id === row.id)?.bscCategoryId,
+      bscCategoryId: row.bscCategoryId,
     });
     setEditOpen(true);
   };
@@ -246,50 +242,6 @@ const Dashboard = () => {
     });
   };
 
-  const bscTableColumns = [
-    {
-      title: 'Tên KPI', dataIndex: 'name',
-      render: val => <span style={{ fontWeight: 500 }}>{val}</span>,
-    },
-    {
-      title: 'Mục tiêu', width: 110, align: 'center',
-      render: (_, row) => <span style={{ color: '#6b7280' }}>{row.target} {row.unit}</span>,
-    },
-    {
-      title: 'Thực tế', width: 90, align: 'center',
-      render: (_, row) => row.actual != null ? row.actual : <span style={{ color: '#6b7280' }}>—</span>,
-    },
-    {
-      title: 'Hoàn thành', width: 110, align: 'center',
-      render: (_, row) => {
-        const r = row.completionRate;
-        const color = r >= 85 ? '#16a34a' : r >= 70 ? '#d97706' : '#dc2626';
-        const bg = r >= 85 ? 'rgba(22,163,74,0.1)' : r >= 70 ? 'rgba(217,119,6,0.1)' : 'rgba(220,38,38,0.1)';
-        return (
-          <span style={{ display: 'inline-flex', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600, color, background: bg }}>
-            {r.toFixed(1)}%
-          </span>
-        );
-      },
-    },
-    {
-      title: 'Trạng thái', width: 110, align: 'center',
-      render: (_, row) => {
-        const label = getStatusLabel(row.status);
-        const color = getStatusColor(row.status);
-        return <Tag color={color}>{label}</Tag>;
-      },
-    },
-    ...(canManageKpis ? [{
-      title: '', width: 80, align: 'center',
-      render: (_, row) => (
-        <Space size={4}>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(row)} />
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(row)} />
-        </Space>
-      ),
-    }] : []),
-  ];
 
   return (
     <div>
@@ -452,31 +404,17 @@ const Dashboard = () => {
         </Modal>
       )}
 
-      {/* BSC KPI Table grouped by category */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {bscGroups.length === 0 && !loading && (
-          <Card><Text type="secondary">Không có KPI nào trong năm {year}.</Text></Card>
-        )}
-        {bscGroups.map(({ bsc, rows }) => (
-          <Card
-            key={bsc}
-            size="small"
-            title={
-              <span style={{ color: bscColorMap[bsc] || '#1a1f2e', fontWeight: 600 }}>{bsc}</span>
-            }
-            styles={{ body: { padding: 0 } }}
-          >
-            <Table
-              columns={bscTableColumns}
-              dataSource={rows}
-              rowKey="id"
-              pagination={false}
-              size="small"
-              loading={loading}
-            />
-          </Card>
-        ))}
-      </div>
+      {/* BSC KPI Table */}
+      <KpiSystemTable
+        kpis={rawKpis}
+        allEntries={allEntries}
+        bscCategoryMap={bscCategoryMap}
+        penaltyLogics={penaltyLogics}
+        canManage={canManageKpis}
+        onEdit={openEdit}
+        onDelete={handleDelete}
+        loading={loading}
+      />
     </div>
   );
 };
