@@ -98,6 +98,7 @@ export const NotificationTableCard = ({
 export const NotificationFormModal = ({
   open,
   editingNotification,
+  submitting = false,
   form,
   onCancel,
   onSubmit,
@@ -106,7 +107,13 @@ export const NotificationFormModal = ({
     title={editingNotification ? 'Chỉnh sửa Thông báo' : 'Tạo Thông báo Mới'}
     open={open}
     onOk={() => form.submit()}
-    onCancel={onCancel}
+    onCancel={() => { if (!submitting) onCancel(); }}
+    confirmLoading={submitting}
+    okButtonProps={{ disabled: submitting }}
+    cancelButtonProps={{ disabled: submitting }}
+    closable={!submitting}
+    maskClosable={!submitting}
+    keyboard={!submitting}
     width={600}
   >
     <Form form={form} layout="vertical" onFinish={onSubmit}>

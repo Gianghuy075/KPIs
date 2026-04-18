@@ -11,6 +11,7 @@ const NotificationManagementFeature = () => {
   const {
     notifications,
     loading,
+    submitting,
     modalOpen,
     setModalOpen,
     editingNotification,
@@ -62,6 +63,7 @@ const NotificationManagementFeature = () => {
       <NotificationFormModal
         open={modalOpen}
         editingNotification={editingNotification}
+        submitting={submitting}
         form={form}
         onCancel={onCancelModal}
         onSubmit={onSubmitModal}

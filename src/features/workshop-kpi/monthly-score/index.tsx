@@ -10,7 +10,14 @@ import {
 } from './components';
 import { useMonthlyScoreData } from './useMonthlyScoreData';
 
-const MonthlyScoreView = ({ kpis, bscCategoryMap, penaltyLogics, year, bonusConfig }) => {
+const MonthlyScoreView = ({
+  kpis,
+  bscCategoryMap,
+  penaltyLogics,
+  year,
+  bonusConfig,
+  employees = [],
+}) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
   const {
@@ -41,6 +48,7 @@ const MonthlyScoreView = ({ kpis, bscCategoryMap, penaltyLogics, year, bonusConf
     selectedMonth,
     bonusConfig,
     entriesByKpi,
+    employees,
   });
 
   if (loading) {

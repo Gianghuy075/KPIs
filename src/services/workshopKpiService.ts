@@ -12,8 +12,11 @@ import type {
   ApiMonthlyEntry,
   ApiPeriodTarget,
   ApiWorkshop,
+  CreateKpiBulkRequest,
   KpiListParams,
   PeriodType,
+  ReplacePeriodTargetsRequest,
+  UpsertKpiBulkRequest,
   UpdateDailyEntryRequest,
   UpdateMonthlyEntryRequest,
   UUID,
@@ -38,6 +41,14 @@ export default {
     ),
   create: (payload: Partial<ApiKpi>): Promise<ApiKpi> =>
     apiClient.post('/kpis', payload).then((response) => normalizeKpi(response.data)),
+  createBulk: (payload: CreateKpiBulkRequest): Promise<ApiKpi[]> =>
+    apiClient
+      .post('/kpis/bulk', payload)
+      .then((response) => (response.data || []).map(normalizeKpi)),
+  upsertBulk: (payload: UpsertKpiBulkRequest): Promise<ApiKpi[]> =>
+    apiClient
+      .post('/kpis/bulk', payload)
+      .then((response) => (response.data || []).map(normalizeKpi)),
   update: (id: UUID, payload: Partial<ApiKpi>): Promise<ApiKpi> =>
     apiClient.patch(`/kpis/${id}`, payload).then((response) => normalizeKpi(response.data)),
   remove: (id: UUID): Promise<void> =>
@@ -47,8 +58,13 @@ export default {
     apiClient.get(`/kpis/${kpiId}/period-targets`, { params: { periodType } }).then((response) =>
       (response.data || []).map(normalizePeriodTarget),
     ),
-  savePeriodTargets: (kpiId: UUID, targets: unknown): Promise<unknown> =>
-    apiClient.put(`/kpis/${kpiId}/period-targets`, targets).then((response) => response.data),
+  savePeriodTargets: (
+    kpiId: UUID,
+    payload: ReplacePeriodTargetsRequest,
+  ): Promise<ApiPeriodTarget[]> =>
+    apiClient
+      .put(`/kpis/${kpiId}/period-targets`, payload)
+      .then((response) => (response.data || []).map(normalizePeriodTarget)),
 
   getMonthlyEntries: (kpiId: UUID): Promise<ApiMonthlyEntry[]> =>
     apiClient.get(`/kpis/${kpiId}/monthly-entries`).then((response) =>

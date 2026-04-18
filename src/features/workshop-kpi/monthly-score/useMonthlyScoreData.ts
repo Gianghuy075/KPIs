@@ -4,6 +4,7 @@ import { calcCompletionRate } from '../../../utils/bonusUtils';
 import { round2 } from '../../../utils/scoreUtils';
 import { BSC_ENUM } from '../../../constants/bsc';
 import { DEFAULT_BONUS_CONFIG } from './constants';
+import { roleLabels } from '../../../constants/roles';
 
 const EMPTY_ENTRY = Object.freeze({ actualValue: null, errorCount: 0, note: '' });
 
@@ -14,6 +15,7 @@ export const useMonthlyScoreData = ({
   selectedMonth,
   bonusConfig,
   entriesByKpi,
+  employees = [],
 }) => {
   const config = useMemo(() => {
     const weightOverrides = {};
@@ -79,15 +81,20 @@ export const useMonthlyScoreData = ({
     return round2(individualScore * indRatio + deptScore * deptRatio);
   }, [config.individualRatio, deptScore, individualScore]);
 
-  const peopleRows = useMemo(
-    () => [
-      {
-        id: 'workshop-total',
-        name: 'Tổng phân xưởng',
-      },
-    ],
-    [],
-  );
+  const peopleRows = useMemo(() => {
+    if ((employees || []).length > 0) {
+      return employees.map((employee) => ({
+        id: employee.id,
+        name: employee.fullName || employee.username,
+        roleLabel: roleLabels[employee.role] || 'Nhân viên',
+        individualScore,
+        deptScore,
+        finalScore,
+      }));
+    }
+
+    return [];
+  }, [deptScore, employees, finalScore, individualScore]);
 
   return {
     config,

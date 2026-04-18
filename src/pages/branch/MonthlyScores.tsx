@@ -49,6 +49,14 @@ const MonthlyScores = () => {
     return map;
   }, [bscCategories]);
 
+  const workshopKpis = useMemo(() => {
+    if (!phanXuongId) return [];
+    return (kpis || []).filter((kpi) => {
+      const kpiWorkshopId = kpi.phanXuongId || kpi.phanXuong?.id;
+      return String(kpiWorkshopId) === String(phanXuongId);
+    });
+  }, [kpis, phanXuongId]);
+
   const yearOptions = toYearOptions(years);
 
   if (!phanXuongId) {
@@ -66,11 +74,11 @@ const MonthlyScores = () => {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 48 }}><Spin size="large" /></div>
-      ) : kpis.length === 0 ? (
+      ) : workshopKpis.length === 0 ? (
         <Card><div style={{ textAlign: 'center', padding: 32, color: '#6b7280' }}>Chưa có KPI nào cho năm {selectedYear}.</div></Card>
       ) : (
         <MonthlyScoreView
-          kpis={kpis}
+          kpis={workshopKpis}
           bscCategoryMap={bscCategoryMap}
           penaltyLogics={penaltyLogics}
           year={selectedYear}

@@ -6,6 +6,7 @@ import workshopKpiService from '../../services/workshopKpiService';
 const BranchManagement = () => {
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [form] = Form.useForm();
@@ -65,6 +66,7 @@ const BranchManagement = () => {
   };
 
   const handleSubmit = async (values) => {
+    setSubmitting(true);
     try {
       if (editingItem) {
         const updated = await workshopKpiService.updateWorkshop(editingItem.id, values);
@@ -80,6 +82,8 @@ const BranchManagement = () => {
       setEditingItem(null);
     } catch (err) {
       message.error(err.message || 'Lưu phân xưởng thất bại');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -109,8 +113,13 @@ const BranchManagement = () => {
       <Modal
         title={editingItem ? 'Chỉnh sửa phân xưởng' : 'Thêm phân xưởng'}
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); form.resetFields(); }}
+        onCancel={() => { if (!submitting) { setModalOpen(false); form.resetFields(); } }}
         onOk={() => form.submit()}
+        confirmLoading={submitting}
+        okButtonProps={{ disabled: submitting }}
+        cancelButtonProps={{ disabled: submitting }}
+        maskClosable={!submitting}
+        keyboard={!submitting}
         destroyOnHide
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>

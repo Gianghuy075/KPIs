@@ -5,6 +5,7 @@ import { notificationService } from '../../../services/notificationService';
 export const useNotificationManagement = ({ createNotification, deleteNotification }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNotification, setEditingNotification] = useState(null);
 
@@ -45,6 +46,7 @@ export const useNotificationManagement = ({ createNotification, deleteNotificati
   };
 
   const handleSubmit = async (values) => {
+    setSubmitting(true);
     try {
       if (editingNotification) {
         await notificationService.updateNotification(editingNotification.id, values);
@@ -64,12 +66,15 @@ export const useNotificationManagement = ({ createNotification, deleteNotificati
     } catch {
       message.error('Không thể lưu thông báo');
       return false;
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return {
     notifications,
     loading,
+    submitting,
     modalOpen,
     setModalOpen,
     editingNotification,

@@ -126,20 +126,26 @@ export const usePeriodTargetState = ({ kpis, bscCategoryMap }) => {
       await Promise.all(
         kpis.map(async (item) => {
           const pt = getLocal(item.id);
-          const targets = [
-            ...Object.entries(pt.quarterly).map(([index, value]) => ({
-              periodType: 'quarterly',
+          const quarterlyPayload = {
+            periodType: 'quarterly',
+            targets: Object.entries(pt.quarterly).map(([index, value]) => ({
               periodKey: String(Number(index) + 1),
               targetValue: parseNum(value),
             })),
-            ...Object.entries(pt.monthly).map(([index, value]) => ({
-              periodType: 'monthly',
-              periodKey: String(Number(index) + 1),
-              targetValue: parseNum(value),
-            })),
-          ];
+          };
 
-          await workshopKpiService.savePeriodTargets(item.id, targets);
+          const monthlyPayload = {
+            periodType: 'monthly',
+            targets: Object.entries(pt.monthly).map(([index, value]) => ({
+              periodKey: String(Number(index) + 1),
+              targetValue: parseNum(value),
+            })),
+          };
+
+          await Promise.all([
+            workshopKpiService.savePeriodTargets(item.id, quarterlyPayload),
+            workshopKpiService.savePeriodTargets(item.id, monthlyPayload),
+          ]);
         }),
       );
       message.success('Đã lưu mục tiêu theo kỳ thành công!');

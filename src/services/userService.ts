@@ -1,8 +1,15 @@
 import { apiClient } from './apiClient';
-import type { ApiUser, CreateUserRequest, UpdateUserRequest, UUID } from '../types/api';
+import type {
+  ApiUser,
+  CreateUserRequest,
+  UpdateUserRequest,
+  UserListParams,
+  UUID,
+} from '../types/api';
 
 export const userService = {
-  getUsers: (): Promise<ApiUser[]> => apiClient.get('/users').then((response) => response.data),
+  getUsers: (params?: UserListParams): Promise<ApiUser[]> =>
+    apiClient.get('/users', { params }).then((response) => response.data),
   createUser: (payload: CreateUserRequest): Promise<ApiUser> =>
     apiClient.post('/users', payload).then((response) => response.data),
   updateUser: (id: UUID, payload: UpdateUserRequest): Promise<ApiUser> =>

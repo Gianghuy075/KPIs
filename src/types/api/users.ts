@@ -2,6 +2,11 @@ import type { UserRole } from './enums';
 import type { UUID } from './common';
 import type { ApiWorkshop } from './workshop';
 
+export interface UserListParams {
+  role?: UserRole | string;
+  phanXuongId?: UUID;
+}
+
 export interface ApiUser {
   id: UUID;
   username: string;

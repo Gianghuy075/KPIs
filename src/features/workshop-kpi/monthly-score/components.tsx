@@ -193,7 +193,7 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
     {
       title: 'Vai trò',
       key: 'role',
-      render: () => (
+      render: (_, row) => (
         <span
           style={{
             display: 'inline-flex',
@@ -205,7 +205,7 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
             color: KPI_COLORS.infoBlue,
           }}
         >
-          Tổng hợp
+          {row.roleLabel || 'Tổng hợp'}
         </span>
       ),
     },
@@ -213,8 +213,9 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
       title: 'Điểm CN',
       key: 'indScore',
       align: 'center',
-      render: () => {
-        const style = getScoreStyle(individualScore);
+      render: (_, row) => {
+        const rowIndividualScore = row.individualScore ?? individualScore;
+        const style = getScoreStyle(rowIndividualScore);
         return (
           <span
             style={{
@@ -228,7 +229,7 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
               fontWeight: 700,
             }}
           >
-            {individualScore}
+            {rowIndividualScore}
           </span>
         );
       },
@@ -237,8 +238,9 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
       title: 'Điểm PB',
       key: 'deptScore',
       align: 'center',
-      render: () => {
-        const style = getScoreStyle(deptScore);
+      render: (_, row) => {
+        const rowDeptScore = row.deptScore ?? deptScore;
+        const style = getScoreStyle(rowDeptScore);
         return (
           <span
             style={{
@@ -252,7 +254,7 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
               fontWeight: 700,
             }}
           >
-            {deptScore}
+            {rowDeptScore}
           </span>
         );
       },
@@ -261,8 +263,9 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
       title: 'Điểm cuối',
       key: 'finalScore',
       align: 'center',
-      render: () => {
-        const style = getScoreStyle(finalScore);
+      render: (_, row) => {
+        const rowFinalScore = row.finalScore ?? finalScore;
+        const style = getScoreStyle(rowFinalScore);
         return (
           <span
             style={{
@@ -276,7 +279,7 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
               fontWeight: 900,
             }}
           >
-            {finalScore}
+            {rowFinalScore}
           </span>
         );
       },
@@ -285,8 +288,9 @@ export const PeopleScoreTable = ({ selectedMonth, peopleRows, individualScore, d
       title: 'Xếp loại',
       key: 'rating',
       align: 'center',
-      render: () => {
-        const rating = getFinalRating(finalScore);
+      render: (_, row) => {
+        const rowFinalScore = row.finalScore ?? finalScore;
+        const rating = getFinalRating(rowFinalScore);
         return (
           <Tag
             style={{

@@ -22,6 +22,30 @@ export interface CreateKpiRequest {
 
 export type UpdateKpiRequest = Partial<CreateKpiRequest>;
 
+export type CreateKpiItemRequest = Omit<CreateKpiRequest, 'year' | 'phanXuongId'>;
+
+export interface UpsertKpiBulkItemRequest {
+  id?: UUID;
+  bscCategoryId?: UUID;
+  name?: string;
+  targetValue?: number;
+  targetUnit?: string;
+  weight: number;
+  penaltyLogicId?: UUID;
+}
+
+export interface CreateKpiBulkRequest {
+  year: number;
+  phanXuongId: UUID;
+  kpis: UpsertKpiBulkItemRequest[];
+}
+
+export interface UpsertKpiBulkRequest {
+  year: number;
+  phanXuongId: UUID;
+  kpis: UpsertKpiBulkItemRequest[];
+}
+
 export interface ApiKpi {
   id: UUID;
   year: number;

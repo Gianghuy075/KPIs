@@ -22,6 +22,7 @@ const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
@@ -113,6 +114,7 @@ const UserManagement = () => {
   };
 
   const handleSubmit = async (values) => {
+    setSubmitting(true);
     try {
       if (editingUser) {
         const payload = {
@@ -143,6 +145,8 @@ const UserManagement = () => {
       setEditingUser(null);
     } catch (err) {
       message.error(err.message || 'Lưu thất bại');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -172,8 +176,19 @@ const UserManagement = () => {
       <Modal
         title={editingUser ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên'}
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); form.resetFields(); setEditingUser(null); }}
+        onCancel={() => {
+          if (!submitting) {
+            setModalOpen(false);
+            form.resetFields();
+            setEditingUser(null);
+          }
+        }}
         onOk={() => form.submit()}
+        confirmLoading={submitting}
+        okButtonProps={{ disabled: submitting }}
+        cancelButtonProps={{ disabled: submitting }}
+        maskClosable={!submitting}
+        keyboard={!submitting}
         destroyOnHide
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>

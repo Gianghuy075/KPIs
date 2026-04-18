@@ -4,6 +4,8 @@ import MonthlyScoreView from '../../features/workshop-kpi/MonthlyScoreView';
 import { useWorkshopKpiMeta } from '../../hooks/useWorkshopKpiMeta';
 import { useWorkshopKpiDataset } from '../../hooks/useWorkshopKpiDataset';
 import { getCurrentYear, getYearRange, toYearOptions } from '../../constants/year';
+import { ROLES } from '../../constants/roles';
+import { userService } from '../../services/userService';
 
 const currentYear = getCurrentYear();
 const years = getYearRange(currentYear);
@@ -11,6 +13,8 @@ const years = getYearRange(currentYear);
 const AdminMonthlyScores = () => {
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedWorkshopId, setSelectedWorkshopId] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   const {
     workshops,
@@ -46,6 +50,41 @@ const AdminMonthlyScores = () => {
     if (datasetError) message.error(datasetError);
   }, [datasetError]);
 
+  useEffect(() => {
+    if (!selectedWorkshopId) {
+      setEmployees([]);
+      setLoadingEmployees(false);
+      return;
+    }
+
+    let mounted = true;
+    setLoadingEmployees(true);
+
+    userService
+      .getUsers({ role: ROLES.EMPLOYEE, phanXuongId: selectedWorkshopId })
+      .then((rows) => {
+        if (!mounted) return;
+        const activeEmployees = (rows || []).filter((row) => row.isActive !== false);
+        setEmployees(activeEmployees);
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        const apiMessage = error?.response?.data?.message;
+        const msg = Array.isArray(apiMessage)
+          ? apiMessage.join(', ')
+          : (apiMessage || error?.message || 'Không thể tải danh sách nhân viên');
+        message.error(msg);
+        setEmployees([]);
+      })
+      .finally(() => {
+        if (mounted) setLoadingEmployees(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedWorkshopId]);
+
   const bscCategoryMap = useMemo(() => {
     const map = {};
     bscCategories.forEach((category) => {
@@ -76,7 +115,7 @@ const AdminMonthlyScores = () => {
         </Space>
       </Card>
 
-      {loadingKpis ? (
+      {loadingKpis || loadingEmployees ? (
         <div style={{ textAlign: 'center', padding: 48 }}><Spin size="large" /></div>
       ) : kpis.length === 0 ? (
         <Card>
@@ -91,6 +130,7 @@ const AdminMonthlyScores = () => {
           penaltyLogics={penaltyLogics}
           year={selectedYear}
           bonusConfig={bonusConfig}
+          employees={employees}
         />
       )}
     </div>

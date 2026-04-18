@@ -11,9 +11,18 @@ import workshopKpiService from '../../services/workshopKpiService';
 import { getCurrentYear, getYearRange, toYearOptions } from '../../constants/year';
 import { useWorkshopKpiMeta } from '../../hooks/useWorkshopKpiMeta';
 import { useWorkshopKpiDataset } from '../../hooks/useWorkshopKpiDataset';
+import type { UpsertKpiBulkItemRequest, UUID } from '../../types/api';
 
 const currentYear = getCurrentYear();
 const years = getYearRange(currentYear);
+
+const extractErrorMessage = (error, fallback = 'Thao tác thất bại') => {
+  const apiMessage = error?.response?.data?.message;
+  if (Array.isArray(apiMessage)) return apiMessage.join(', ');
+  if (apiMessage) return String(apiMessage);
+  if (error?.message) return error.message;
+  return fallback;
+};
 
 const WorkshopKpis = () => {
   const { modal } = AntApp.useApp();
@@ -112,18 +121,26 @@ const WorkshopKpis = () => {
     });
   };
 
-  const handleCreateKpi = async (payload, workshopIds, year) => {
+  const handleUpsertKpis = async (
+    payloads: UpsertKpiBulkItemRequest[],
+    workshopId: UUID,
+    year: string,
+  ) => {
     try {
-      await Promise.all(
-        workshopIds.map((phanXuongId) =>
-          workshopKpiService.create({ ...payload, phanXuongId, year: Number(year) }),
-        ),
-      );
-      if (workshopIds.includes(selectedWorkshopId)) {
+      await workshopKpiService.upsertBulk({
+        year: Number(year),
+        phanXuongId: workshopId,
+        kpis: payloads,
+      });
+
+      if (String(workshopId) === String(selectedWorkshopId) && String(year) === String(selectedYear)) {
         reload();
       }
-    } catch {
-      message.error('Tạo KPI thất bại');
+      message.success('Đã lưu KPI thành công');
+      setCreateModalOpen(false);
+    } catch (error) {
+      message.error(extractErrorMessage(error, 'Lưu KPI thất bại'));
+      throw error;
     }
   };
 
@@ -199,7 +216,7 @@ const WorkshopKpis = () => {
         open={createModalOpen}
         onCancel={() => setCreateModalOpen(false)}
         footer={null}
-        width={900}
+        width="min(1280px, 96vw)"
         destroyOnClose
       >
         <WorkshopKpiCreateForm
@@ -207,10 +224,9 @@ const WorkshopKpis = () => {
           bscCategories={bscCategories}
           years={years}
           penaltyLogics={penaltyLogics}
-          onCreateKpi={async (payload, workshopIds, year) => {
-            await handleCreateKpi(payload, workshopIds, year);
-            setCreateModalOpen(false);
-          }}
+          initialYear={selectedYear}
+          initialWorkshopId={selectedWorkshopId}
+          onUpsertKpis={handleUpsertKpis}
         />
       </Modal>
 
