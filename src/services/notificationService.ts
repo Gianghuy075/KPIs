@@ -1,5 +1,23 @@
+type NotificationRecipient = 'branch_manager' | 'employee';
+type NotificationRole = NotificationRecipient | 'senior_manager';
+type NotificationStatus = 'active' | 'inactive' | 'read';
+
+type NotificationItem = {
+  id: number;
+  title: string;
+  content: string;
+  createdBy: string;
+  createdAt: string;
+  recipients: NotificationRecipient[];
+  status: NotificationStatus;
+};
+
+type NotificationPayload = Omit<NotificationItem, 'id' | 'createdAt' | 'status'> & {
+  status?: NotificationStatus;
+};
+
 // Service quản lý thông báo
-let notificationsData = [
+let notificationsData: NotificationItem[] = [
   {
     id: 1,
     title: 'Thông báo OKR Q1',
@@ -15,10 +33,10 @@ let nextNotificationId = 2;
 
 export const notificationService = {
   // Lấy thông báo theo role
-  getNotificationsByRole: async (role) => {
+  getNotificationsByRole: async (role: NotificationRole): Promise<NotificationItem[]> => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        const filtered = notificationsData.filter(notif => {
+        const filtered = notificationsData.filter((notif) => {
           // Thông báo cho manager
           if (role === 'branch_manager') return notif.recipients.includes('branch_manager');
           // Thông báo cho employee
@@ -33,7 +51,7 @@ export const notificationService = {
   },
 
   // Lấy tất cả thông báo
-  getAllNotifications: async () => {
+  getAllNotifications: async (): Promise<NotificationItem[]> => {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(notificationsData);
@@ -42,14 +60,14 @@ export const notificationService = {
   },
 
   // Tạo thông báo mới (chỉ cho senior manager)
-  createNotification: async (notificationData) => {
+  createNotification: async (notificationData: NotificationPayload): Promise<NotificationItem> => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        const newNotification = {
+        const newNotification: NotificationItem = {
           ...notificationData,
           id: nextNotificationId++,
           createdAt: new Date().toISOString(),
-          status: 'active',
+          status: notificationData.status ?? 'active',
         };
         notificationsData.push(newNotification);
         resolve(newNotification);
@@ -58,10 +76,13 @@ export const notificationService = {
   },
 
   // Cập nhật thông báo
-  updateNotification: async (id, updates) => {
+  updateNotification: async (
+    id: number,
+    updates: Partial<NotificationItem>,
+  ): Promise<NotificationItem> => {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
-        const index = notificationsData.findIndex(n => n.id === id);
+        const index = notificationsData.findIndex((n) => n.id === id);
         if (index !== -1) {
           notificationsData[index] = { ...notificationsData[index], ...updates };
           resolve(notificationsData[index]);
@@ -73,27 +94,27 @@ export const notificationService = {
   },
 
   // Xóa thông báo
-  deleteNotification: async (id) => {
-    return new Promise((resolve) => {
+  deleteNotification: async (id: number): Promise<void> => {
+    return new Promise<void>((resolve) => {
       setTimeout(() => {
-        notificationsData = notificationsData.filter(n => n.id !== id);
+        notificationsData = notificationsData.filter((n) => n.id !== id);
         resolve();
       }, 100);
     });
   },
 
   // Lấy thông báo chưa đọc
-  getUnreadNotifications: async (role) => {
+  getUnreadNotifications: async (role: NotificationRole): Promise<NotificationItem[]> => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        const filtered = notificationsData.filter(notif => {
+        const filtered = notificationsData.filter((notif) => {
           const isForRole =
             role === 'branch_manager'
               ? notif.recipients.includes('branch_manager')
               : role === 'employee'
                 ? notif.recipients.includes('employee')
                 : true;
-          
+
           return isForRole && notif.status === 'active';
         });
         resolve(filtered);

@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "useDefineForClassFields": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "src/types/**/*.ts",
+    "src/services/apiClient.ts",
+    "src/services/apiMappers.ts",
+    "src/services/authService.ts",
+    "src/services/bonusConfigService.ts",
+    "src/services/notificationService.ts",
+    "src/services/penaltyService.ts",
+    "src/services/userService.ts",
+    "src/services/workshopKpiService.ts",
+    "src/hooks/useApiClient.ts",
+    "src/hooks/useMonthlyEntriesMap.ts",
+    "src/hooks/useWorkshopKpiDataset.ts",
+    "src/hooks/useWorkshopKpiMeta.ts",
+    "src/utils/entryUtils.ts",
+    "src/vite-env.d.ts",
+    "vite.config.js",
+    "eslint.config.js"
+  ]
+}

@@ -2,9 +2,33 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import bonusConfigService from '../services/bonusConfigService';
 import workshopKpiService from '../services/workshopKpiService';
 import { normalizeEntriesByMonth } from '../utils/entryUtils';
+import type {
+  ApiBonusConfig,
+  ApiKpi,
+  ApiMonthlyEntry,
+  BonusConfigListParams,
+  KpiListParams,
+} from '../types/api';
 
-const EMPTY_ARRAY = [];
-const EMPTY_OBJECT = {};
+const EMPTY_KPIS: ApiKpi[] = [];
+const EMPTY_OBJECT: Record<string, never> = {};
+
+type EntriesListByKpi = Record<string, ApiMonthlyEntry[]>;
+type EntriesByMonthByKpi = Record<string, Record<number, ApiMonthlyEntry>>;
+
+type DatasetOptions = {
+  year?: number | string;
+  workshopId?: string | null;
+  includeBonusConfig?: boolean;
+  includeMonthlyEntries?: boolean;
+  normalizeMonthlyEntries?: boolean;
+  enabled?: boolean;
+};
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
 
 export const useWorkshopKpiDataset = ({
   year,
@@ -13,10 +37,10 @@ export const useWorkshopKpiDataset = ({
   includeMonthlyEntries = false,
   normalizeMonthlyEntries = false,
   enabled = true,
-} = {}) => {
-  const [kpis, setKpis] = useState(EMPTY_ARRAY);
-  const [bonusConfig, setBonusConfig] = useState(null);
-  const [entriesByKpi, setEntriesByKpi] = useState(EMPTY_OBJECT);
+}: DatasetOptions = {}) => {
+  const [kpis, setKpis] = useState<ApiKpi[]>(EMPTY_KPIS);
+  const [bonusConfig, setBonusConfig] = useState<ApiBonusConfig | null>(null);
+  const [entriesByKpi, setEntriesByKpi] = useState<EntriesListByKpi | EntriesByMonthByKpi>(EMPTY_OBJECT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -25,7 +49,7 @@ export const useWorkshopKpiDataset = ({
 
   useEffect(() => {
     if (!enabled || !workshopId || !year) {
-      setKpis(EMPTY_ARRAY);
+      setKpis(EMPTY_KPIS);
       setBonusConfig(null);
       setEntriesByKpi(EMPTY_OBJECT);
       return;
@@ -38,18 +62,28 @@ export const useWorkshopKpiDataset = ({
       setError('');
 
       try {
-        const requests = [
-          workshopKpiService.list({ year, phanXuongId: workshopId }),
-          includeBonusConfig
-            ? bonusConfigService.list({ year, phanXuongId: workshopId })
-            : Promise.resolve([]),
-        ];
+        const kpiParams: KpiListParams = {
+          year,
+          phanXuongId: workshopId,
+        };
+        const bonusParams: BonusConfigListParams = {
+          year,
+          phanXuongId: workshopId,
+        };
 
-        const [kpiList, cfgList] = await Promise.all(requests);
+        const kpiPromise = workshopKpiService.list(kpiParams);
+        const bonusConfigPromise: Promise<ApiBonusConfig[]> = includeBonusConfig
+          ? bonusConfigService.list(bonusParams)
+          : Promise.resolve([]);
+
+        const [kpiList, cfgList] = await Promise.all([
+          kpiPromise,
+          bonusConfigPromise,
+        ]);
 
         if (!mounted) return;
 
-        const normalizedKpis = Array.isArray(kpiList) ? kpiList : [];
+        const normalizedKpis: ApiKpi[] = Array.isArray(kpiList) ? kpiList : [];
         setKpis(normalizedKpis);
         setBonusConfig(includeBonusConfig ? (cfgList?.[0] ?? null) : null);
 
@@ -59,7 +93,7 @@ export const useWorkshopKpiDataset = ({
         }
 
         const entriesResults = await Promise.all(
-          normalizedKpis.map(async (kpi) => {
+          normalizedKpis.map(async (kpi): Promise<[string, ApiMonthlyEntry[]]> => {
             try {
               const entries = await workshopKpiService.getMonthlyEntries(kpi.id);
               return [kpi.id, entries];
@@ -71,17 +105,19 @@ export const useWorkshopKpiDataset = ({
 
         if (!mounted) return;
 
-        const rawEntries = {};
+        const rawEntries: EntriesListByKpi = {};
         entriesResults.forEach(([kpiId, entries]) => {
           rawEntries[kpiId] = entries;
         });
 
         setEntriesByKpi(
-          normalizeMonthlyEntries ? normalizeEntriesByMonth(rawEntries) : rawEntries,
+          normalizeMonthlyEntries
+            ? normalizeEntriesByMonth(rawEntries)
+            : rawEntries,
         );
-      } catch (err) {
+      } catch (errorValue) {
         if (!mounted) return;
-        setError(err?.message || 'Không thể tải dữ liệu KPI');
+        setError(getErrorMessage(errorValue, 'Không thể tải dữ liệu KPI'));
       } finally {
         if (mounted) setLoading(false);
       }
