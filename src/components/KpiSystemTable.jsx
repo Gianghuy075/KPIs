@@ -3,15 +3,7 @@ import { Table, Button, Space } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { calcCompletionRate } from '../utils/bonusUtils';
 import { calculatePenalty } from '../utils/penaltyUtils';
-
-const BSC_ORDER = ['Tài chính', 'Khách hàng', 'Quy trình nội bộ', 'Học hỏi & Phát triển'];
-
-const BSC_COLORS = {
-  'Tài chính': { color: '#1d4ed8', background: '#dbeafe' },
-  'Khách hàng': { color: '#15803d', background: '#dcfce7' },
-  'Quy trình nội bộ': { color: '#b45309', background: '#fef3c7' },
-  'Học hỏi & Phát triển': { color: '#7c3aed', background: '#ede9fe' },
-};
+import { BSC_ORDER, BSC_TABLE_COLORS } from '../constants/bsc';
 
 const getRatingStyle = (rate) => {
   if (rate >= 85) return { color: '#16a34a', background: '#dcfce7' };
@@ -127,7 +119,7 @@ const KpiSystemTable = ({
             </div>
           );
         }
-        const style = BSC_COLORS[row.bscName] || { color: '#6b7280', background: '#f3f4f6' };
+        const style = BSC_TABLE_COLORS[row.bscName] || { color: '#6b7280', background: '#f3f4f6' };
         return (
           <span style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', ...style }}>
             {row.bscName}

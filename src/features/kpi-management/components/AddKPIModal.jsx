@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, Form, Input, InputNumber, Select, Switch, Row, Col, Alert, Space } from 'antd';
 import { PERSPECTIVES } from '../../../utils/kpiUtils';
 import { calculateTotalWeight, validateTotalWeight } from '../services/kpiService';
@@ -9,18 +9,7 @@ const AddKPIModal = ({ open, onClose, onSubmit, editingKPI, loading, allKPIs = [
   const [form] = Form.useForm();
   const [weightValidation, setWeightValidation] = useState(null);
 
-  useEffect(() => {
-    if (open) {
-      if (editingKPI) {
-        form.setFieldsValue(editingKPI);
-      } else {
-        form.resetFields();
-      }
-      updateWeightValidation();
-    }
-  }, [open, editingKPI, form, allKPIs]);
-
-  const updateWeightValidation = () => {
+  const updateWeightValidation = useCallback(() => {
     // Calculate total weight excluding the KPI being edited
     const kpisForValidation = editingKPI 
       ? allKPIs.filter(k => k.id !== editingKPI.id)
@@ -38,7 +27,18 @@ const AddKPIModal = ({ open, onClose, onSubmit, editingKPI, loading, allKPIs = [
       ...validation,
       totalWeight: parseFloat(totalWeight.toFixed(1)),
     });
-  };
+  }, [allKPIs, editingKPI, form]);
+
+  useEffect(() => {
+    if (open) {
+      if (editingKPI) {
+        form.setFieldsValue(editingKPI);
+      } else {
+        form.resetFields();
+      }
+      updateWeightValidation();
+    }
+  }, [open, editingKPI, form, updateWeightValidation]);
 
   const handleWeightChange = () => {
     updateWeightValidation();

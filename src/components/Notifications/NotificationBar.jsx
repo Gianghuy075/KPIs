@@ -1,11 +1,15 @@
 import React from 'react';
-import { Alert, Button, Space, Tag, Collapse, Empty, Row, Col } from 'antd';
+import { Alert, Button, Space, Tag, Collapse } from 'antd';
 import {
   BellOutlined,
   CloseOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
 import { useNotification } from '../../contexts/NotificationContext';
+import {
+  getRecipientColor,
+  getRecipientLabel,
+} from '../../features/notification/notification-management/helpers';
 
 const NotificationBar = () => {
   const { notifications, hideNotification, markAsRead } = useNotification();
@@ -17,24 +21,11 @@ const NotificationBar = () => {
     return null;
   }
 
-  const getRecipientLabel = (recipients) => {
-    if (recipients.includes('branch_manager') && recipients.includes('employee')) {
-      return 'Cho tất cả';
-    }
-    if (recipients.includes('branch_manager')) {
-      return 'Cho Quản lý phân xưởng';
-    }
+  const getBarRecipientLabel = (recipients) => {
+    const label = getRecipientLabel(recipients);
+    if (label === 'Quản lý + Nhân viên') return 'Cho tất cả';
+    if (label === 'Quản lý Phân xưởng') return 'Cho Quản lý phân xưởng';
     return 'Cho Nhân viên';
-  };
-
-  const getRecipientColor = (recipients) => {
-    if (recipients.includes('branch_manager') && recipients.includes('employee')) {
-      return 'blue';
-    }
-    if (recipients.includes('branch_manager')) {
-      return 'green';
-    }
-    return 'orange';
   };
 
   const items = unreadNotifications.map((notification) => ({
@@ -44,7 +35,7 @@ const NotificationBar = () => {
         <BellOutlined style={{ color: '#1890ff' }} />
         <strong>{notification.title}</strong>
         <Tag color={getRecipientColor(notification.recipients)} style={{ marginLeft: 8 }}>
-          {getRecipientLabel(notification.recipients)}
+          {getBarRecipientLabel(notification.recipients)}
         </Tag>
       </Space>
     ),

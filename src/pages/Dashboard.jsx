@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Row,
   Col,
@@ -19,185 +19,49 @@ import KpiSystemTable from '../components/KpiSystemTable';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import workshopKpiService from '../services/workshopKpiService';
-import penaltyService from '../services/penaltyService';
 import StatisticsCard from '../components/StatisticsCard';
 import PerspectivePieChart from '../components/Charts/PerspectivePieChart';
-import BscBarChart, { SHORT_NAMES } from '../components/Charts/BscBarChart';
+import BscBarChart from '../components/Charts/BscBarChart';
 import MonthlyTrendChart from '../components/Charts/MonthlyTrendChart';
 import NotificationBar from '../components/Notifications/NotificationBar';
-import { getStatus, getStatusLabel, getStatusColor } from '../utils/kpiUtils';
-import { calcCompletionRate } from '../utils/bonusUtils';
+import { getStatusLabel, getStatusColor } from '../utils/kpiUtils';
+import { getCurrentYear, getYearRange } from '../constants/year';
+import { useDashboardData } from '../features/dashboard/useDashboardData';
 
 const { Title, Text } = Typography;
 
-const currentYear = new Date().getFullYear();
-const yearOptions = [currentYear - 1, currentYear, currentYear + 1].map(y => ({ value: y, label: String(y) }));
-
-const bscColorMap = {
-  'Tài chính': '#1d4ed8',
-  'Khách hàng': '#15803d',
-  'Quy trình nội bộ': '#b45309',
-  'Học hỏi & Phát triển': '#7c3aed',
-};
+const currentYear = getCurrentYear();
+const yearOptions = getYearRange(currentYear).map((year) => ({ value: year, label: String(year) }));
 
 const Dashboard = () => {
   const { message, modal } = AntApp.useApp();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [year, setYear] = useState(currentYear);
-  const [rawKpis, setRawKpis] = useState([]);
-  const [bscCategories, setBscCategories] = useState([]);
-  const [penaltyLogics, setPenaltyLogics] = useState([]);
-  const [allEntries, setAllEntries] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editForm] = Form.useForm();
 
-  const isAdmin = user?.role === 'system_admin';
+  const {
+    rawKpis,
+    setRawKpis,
+    penaltyLogics,
+    allEntries,
+    loading,
+    error,
+    refresh,
+    bscCategoryMap,
+    kpis,
+    stats,
+    overallStatus,
+    categoryData,
+    bscBarData,
+    monthlyTrend,
+    isAdmin,
+  } = useDashboardData({ year, user });
+
   const canManageKpis = isAdmin;
-  const phanXuongId = user?.phanXuongId;
-
-  useEffect(() => {
-    Promise.all([
-      workshopKpiService.listBscCategories(),
-      penaltyService.list(),
-    ]).then(([bsc, pl]) => {
-      setBscCategories(bsc);
-      setPenaltyLogics(pl);
-    }).catch(() => {});
-  }, []);
-
-  const fetchKPIs = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = { year };
-      if (!isAdmin && phanXuongId) params.phanXuongId = phanXuongId;
-      const kpiList = await workshopKpiService.list(params);
-      setRawKpis(kpiList || []);
-      const entriesMap = {};
-      await Promise.all((kpiList || []).map(async (kpi) => {
-        try {
-          const entries = await workshopKpiService.getMonthlyEntries(kpi.id);
-          entriesMap[kpi.id] = entries;
-        } catch {
-          entriesMap[kpi.id] = [];
-        }
-      }));
-      setAllEntries(entriesMap);
-    } catch (err) {
-      setError(err?.message || 'Không tải được KPI');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchKPIs();
-  }, [user?.role, year, phanXuongId]);
-
-  const bscCategoryMap = useMemo(() => {
-    const map = {};
-    bscCategories.forEach(c => { map[c.id] = c.name; });
-    return map;
-  }, [bscCategories]);
-
-  const kpis = useMemo(() => rawKpis.map(kpi => {
-    const entries = allEntries[kpi.id] || [];
-    const withData = entries.filter(e => e.actualValue != null);
-    const actual = withData.length ? withData[withData.length - 1].actualValue : null;
-    const completionRate = actual != null && kpi.targetValue
-      ? calcCompletionRate(Number(actual), Number(kpi.targetValue))
-      : 0;
-    return {
-      id: kpi.id,
-      name: kpi.name,
-      unit: kpi.targetUnit || '',
-      weight: Number(kpi.weight || 0),
-      target: Number(kpi.targetValue || 0),
-      actual: actual ?? null,
-      completionRate,
-      bsc: bscCategoryMap[kpi.bscCategoryId] || 'Khác',
-      status: getStatus(completionRate),
-    };
-  }), [rawKpis, allEntries, bscCategoryMap]);
-
-  const stats = useMemo(() => {
-    if (!kpis.length) return null;
-    const completed = kpis.filter(k => k.status === 'completed').length;
-    const warning = kpis.filter(k => k.status === 'warning').length;
-    const risk = kpis.filter(k => k.status === 'risk').length;
-    const weighted = kpis.reduce(
-      (acc, k) => {
-        acc.totalWeight += k.weight || 0;
-        acc.weightedScore += (k.completionRate * (k.weight || 0)) / 100;
-        return acc;
-      },
-      { weightedScore: 0, totalWeight: 0 },
-    );
-    const overallScore = weighted.totalWeight > 0
-      ? (weighted.weightedScore / weighted.totalWeight) * 100
-      : kpis.reduce((s, k) => s + k.completionRate, 0) / kpis.length;
-    return {
-      totalKPIs: kpis.length,
-      overallScore: parseFloat(overallScore.toFixed(1)),
-      completed,
-      warning,
-      risk,
-      totalWeight: weighted.totalWeight,
-    };
-  }, [kpis]);
-
-  const overallStatus = stats ? getStatus(stats?.overallScore) : null;
-
-  const categoryData = useMemo(() => {
-    const map = {};
-    kpis.forEach(k => {
-      map[k.bsc] = (map[k.bsc] || 0) + (k.weight || 1);
-    });
-    return Object.entries(map).map(([name, weight]) => ({ name, value: weight, weight, perspective: name }));
-  }, [kpis]);
-
-  const bscBarData = useMemo(() => {
-    const order = ['Tài chính', 'Khách hàng', 'Quy trình nội bộ', 'Học hỏi & Phát triển'];
-    const groups = {};
-    kpis.forEach(k => {
-      if (!groups[k.bsc]) groups[k.bsc] = [];
-      groups[k.bsc].push(k.completionRate);
-    });
-    return order.filter(b => groups[b]).map(b => ({
-      name: SHORT_NAMES[b] || b,
-      fullName: b,
-      avg: groups[b].reduce((s, v) => s + v, 0) / groups[b].length,
-      count: groups[b].length,
-    }));
-  }, [kpis]);
-
-  const monthlyTrend = useMemo(() => {
-    const months = Array.from({ length: 12 }, (_, i) => ({
-      month: `T${i + 1}`,
-      weightedScore: 0,
-      totalWeight: 0,
-    }));
-    kpis.forEach(kpi => {
-      const entries = allEntries[kpi.id] || [];
-      entries.forEach(e => {
-        const mIdx = (e.month ?? e.monthIndex ?? 1) - 1;
-        if (mIdx >= 0 && mIdx < 12 && e.actualValue != null && kpi.target > 0) {
-          const rate = calcCompletionRate(Number(e.actualValue), kpi.target);
-          months[mIdx].weightedScore += rate * (kpi.weight || 1);
-          months[mIdx].totalWeight += (kpi.weight || 1);
-        }
-      });
-    });
-    return months.map(m => ({
-      month: m.month,
-      score: m.totalWeight > 0 ? parseFloat((m.weightedScore / m.totalWeight).toFixed(1)) : null,
-    }));
-  }, [kpis, allEntries]);
 
   const openEdit = (row) => {
     setEditingKpi(row);
@@ -277,7 +141,7 @@ const Dashboard = () => {
           <Col>
             <Space>
               <Select value={year} onChange={setYear} options={yearOptions} style={{ width: 100 }} />
-              <Button icon={<ReloadOutlined />} onClick={fetchKPIs} loading={loading}>
+              <Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>
                 Làm mới
               </Button>
               {isAdmin && (

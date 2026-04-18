@@ -1,63 +1,52 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, Select, Space, Spin, message } from 'antd';
 import { useAuth } from '../../contexts/AuthContext';
-import workshopKpiService from '../../services/workshopKpiService';
-import penaltyService from '../../services/penaltyService';
 import EmployeeKpiView from '../../features/workshop-kpi/EmployeeKpiView';
+import { getCurrentYear, getYearRange } from '../../constants/year';
+import { useWorkshopKpiMeta } from '../../hooks/useWorkshopKpiMeta';
+import { useWorkshopKpiDataset } from '../../hooks/useWorkshopKpiDataset';
 
-const currentYear = new Date().getFullYear();
-const yearOptions = [currentYear - 1, currentYear, currentYear + 1].map(y => ({ value: y, label: String(y) }));
+const currentYear = getCurrentYear();
+const yearOptions = getYearRange(currentYear).map((year) => ({ value: year, label: String(year) }));
 
 const BranchKpiView = () => {
   const { user } = useAuth();
   const [year, setYear] = useState(currentYear);
-  const [kpis, setKpis] = useState([]);
-  const [bscCategories, setBscCategories] = useState([]);
-  const [penaltyLogics, setPenaltyLogics] = useState([]);
-  const [allEntries, setAllEntries] = useState({});
-  const [loading, setLoading] = useState(false);
 
   const phanXuongId = user?.phanXuongId;
 
-  useEffect(() => {
-    Promise.all([
-      workshopKpiService.listBscCategories(),
-      penaltyService.list(),
-    ]).then(([bsc, pl]) => {
-      setBscCategories(bsc);
-      setPenaltyLogics(pl);
-    }).catch(() => {});
-  }, []);
+  const {
+    bscCategories,
+    penaltyLogics,
+    error: metaError,
+  } = useWorkshopKpiMeta({ includePenaltyLogics: true });
+
+  const {
+    kpis,
+    entriesByKpi,
+    loading,
+    error: datasetError,
+  } = useWorkshopKpiDataset({
+    year,
+    workshopId: phanXuongId,
+    includeMonthlyEntries: true,
+    normalizeMonthlyEntries: true,
+    enabled: Boolean(phanXuongId),
+  });
 
   useEffect(() => {
-    if (!phanXuongId) return;
-    setLoading(true);
-    workshopKpiService.list({ year, phanXuongId })
-      .then(async (kpiList) => {
-        setKpis(kpiList);
-        const entriesMap = {};
-        await Promise.all(kpiList.map(async (kpi) => {
-          try {
-            const entries = await workshopKpiService.getMonthlyEntries(kpi.id);
-            const map = {};
-            (entries || []).forEach(e => {
-              const idx = (e.month ?? e.monthIndex ?? 1) - 1;
-              map[idx] = e;
-            });
-            entriesMap[kpi.id] = map;
-          } catch {
-            entriesMap[kpi.id] = {};
-          }
-        }));
-        setAllEntries(entriesMap);
-      })
-      .catch(() => message.error('Không tải được KPI'))
-      .finally(() => setLoading(false));
-  }, [year, phanXuongId]);
+    if (metaError) message.error(metaError);
+  }, [metaError]);
+
+  useEffect(() => {
+    if (datasetError) message.error(datasetError);
+  }, [datasetError]);
 
   const bscCategoryMap = useMemo(() => {
     const map = {};
-    bscCategories.forEach(c => { map[c.id] = c.name; });
+    bscCategories.forEach((category) => {
+      map[category.id] = category.name;
+    });
     return map;
   }, [bscCategories]);
 
@@ -86,7 +75,7 @@ const BranchKpiView = () => {
           bscCategoryMap={bscCategoryMap}
           penaltyLogics={penaltyLogics}
           year={year}
-          allEntries={allEntries}
+          allEntries={entriesByKpi}
         />
       )}
     </Card>

@@ -214,7 +214,7 @@ export const kpiService = {
   },
 
   addDepartmentKPI: async (departmentId, kpiData) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       setTimeout(() => {
         if (!departmentKPIs[departmentId]) {
           departmentKPIs[departmentId] = [];

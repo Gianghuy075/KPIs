@@ -1,7 +1,8 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 import { setTokenProvider } from '../services/apiClient';
-import { roleLabels, legacyRoleMap } from '../constants/roles';
+import { legacyRoleMap } from '../constants/roles';
 
 const AuthContext = createContext();
 
@@ -52,11 +53,6 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('accessToken');
   };
-
-  const getRoleName = (role) => {
-    return roleLabels[normalizeRole(role)] || role;
-  };
-
   return (
     <AuthContext.Provider value={{ user, token, login, logout, initialized }}>
       {children}

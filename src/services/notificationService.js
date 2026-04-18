@@ -43,7 +43,7 @@ export const notificationService = {
 
   // Tạo thông báo mới (chỉ cho senior manager)
   createNotification: async (notificationData) => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       setTimeout(() => {
         const newNotification = {
           ...notificationData,

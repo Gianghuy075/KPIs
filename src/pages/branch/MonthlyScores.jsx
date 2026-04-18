@@ -1,56 +1,55 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Select, Space, Card, Spin, message } from 'antd';
 import MonthlyScoreView from '../../features/workshop-kpi/MonthlyScoreView';
-import workshopKpiService from '../../services/workshopKpiService';
-import penaltyService from '../../services/penaltyService';
-import bonusConfigService from '../../services/bonusConfigService';
 import { useAuth } from '../../contexts/AuthContext';
+import { getCurrentYear, getYearRange, toYearOptions } from '../../constants/year';
+import { useWorkshopKpiMeta } from '../../hooks/useWorkshopKpiMeta';
+import { useWorkshopKpiDataset } from '../../hooks/useWorkshopKpiDataset';
 
-const currentYear = new Date().getFullYear();
-const years = [currentYear, currentYear - 1, currentYear + 1];
+const currentYear = getCurrentYear();
+const years = getYearRange(currentYear);
 
 const MonthlyScores = () => {
   const { user } = useAuth();
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
-  const [kpis, setKpis] = useState([]);
-  const [bscCategories, setBscCategories] = useState([]);
-  const [penaltyLogics, setPenaltyLogics] = useState([]);
-  const [bonusConfig, setBonusConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const phanXuongId = user?.phanXuongId;
 
-  useEffect(() => {
-    Promise.all([
-      workshopKpiService.listBscCategories(),
-      penaltyService.list(),
-    ]).then(([bsc, pl]) => {
-      setBscCategories(bsc);
-      setPenaltyLogics(pl);
-    }).catch(() => message.error('Không thể tải dữ liệu'));
+  const {
+    bscCategories,
+    penaltyLogics,
+    error: metaError,
+  } = useWorkshopKpiMeta({ includePenaltyLogics: true });
 
-  }, []);
+  const {
+    kpis,
+    bonusConfig,
+    loading,
+    error: datasetError,
+  } = useWorkshopKpiDataset({
+    year: selectedYear,
+    workshopId: phanXuongId,
+    includeBonusConfig: true,
+    enabled: Boolean(phanXuongId),
+  });
 
   useEffect(() => {
-    if (!phanXuongId) return;
-    setLoading(true);
-    Promise.all([
-      workshopKpiService.list({ year: selectedYear, phanXuongId }),
-      bonusConfigService.list({ year: selectedYear, phanXuongId }),
-    ]).then(([kpiList, cfgList]) => {
-      setKpis(kpiList);
-      setBonusConfig(cfgList?.[0] ?? null);
-    }).catch(() => message.error('Không thể tải danh sách KPI'))
-      .finally(() => setLoading(false));
-  }, [phanXuongId, selectedYear]);
+    if (metaError) message.error(metaError);
+  }, [metaError]);
+
+  useEffect(() => {
+    if (datasetError) message.error(datasetError);
+  }, [datasetError]);
 
   const bscCategoryMap = useMemo(() => {
     const map = {};
-    bscCategories.forEach(c => { map[c.id] = c.name; });
+    bscCategories.forEach((category) => {
+      map[category.id] = category.name;
+    });
     return map;
   }, [bscCategories]);
 
-  const yearOptions = years.map(y => ({ value: String(y), label: String(y) }));
+  const yearOptions = toYearOptions(years);
 
   if (!phanXuongId) {
     return <Card><div style={{ textAlign: 'center', padding: 32, color: '#6b7280' }}>Tài khoản của bạn chưa được gán phân xưởng.</div></Card>;
@@ -70,7 +69,13 @@ const MonthlyScores = () => {
       ) : kpis.length === 0 ? (
         <Card><div style={{ textAlign: 'center', padding: 32, color: '#6b7280' }}>Chưa có KPI nào cho năm {selectedYear}.</div></Card>
       ) : (
-        <MonthlyScoreView kpis={kpis} bscCategoryMap={bscCategoryMap} penaltyLogics={penaltyLogics} year={selectedYear} bonusConfig={bonusConfig} />
+        <MonthlyScoreView
+          kpis={kpis}
+          bscCategoryMap={bscCategoryMap}
+          penaltyLogics={penaltyLogics}
+          year={selectedYear}
+          bonusConfig={bonusConfig}
+        />
       )}
     </div>
   );

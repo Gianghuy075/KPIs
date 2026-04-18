@@ -1,40 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { Layout, Menu, Avatar, Dropdown, Typography, Breadcrumb, Space } from 'antd';
 import {
-  DashboardOutlined,
-  BarChartOutlined,
-  SettingOutlined,
   UserOutlined,
   LogoutOutlined,
   TrophyOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  TeamOutlined,
-  FileTextOutlined,
-  CheckOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationManager from '../components/Notifications/NotificationManager';
+import { BREADCRUMB_MAP, getMenuItemsByRole } from './navigationConfig';
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Title } = Typography;
-
-const breadcrumbMap = {
-  '/dashboard': 'Dashboard KPI',
-  '/admin/employee': 'Quản lý Nhân viên',
-  '/admin/branches': 'Quản lý Phân xưởng',
-  '/admin/workshop-kpis': 'KPI Phân xưởng',
-  '/admin/workshop-kpi-view': 'Xem KPI theo phân xưởng',
-  '/admin/monthly-scores-view': 'Điểm KPI tháng theo phân xưởng',
-  '/branch/kpi-view': 'Chi tiết KPI',
-  '/admin/bonus-configs': 'Cấu hình thưởng',
-  '/admin/notifications': 'Quản lý Thông báo',
-  '/admin/penalty-rules': 'Quản lý Quy tắc Trừ điểm KPI',
-  '/branch/data-entry': 'Nhập dữ liệu KPI',
-  '/branch/monthly-scores': 'Điểm KPI tháng',
-  '/me/kpis': 'KPI của tôi',
-};
 
 const MainLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -42,129 +21,11 @@ const MainLayout = ({ children }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  // Tạo menu items dynamically dựa trên user role
-  const getMenuItems = () => {
-    const baseItems = [
-      {
-        key: '/dashboard',
-        icon: <DashboardOutlined />,
-        label: 'Dashboard KPI',
-      },
-    ];
-
-    // Thêm menu items cho Quản lý cấp cao
-    if (user?.role === 'system_admin') {
-      baseItems.push(
-        {
-          key: 'management',
-          icon: <SettingOutlined />,
-          label: 'Quản lý Hệ thống',
-          children: [
-            {
-              key: '/admin/workshop-kpis',
-              icon: <BarChartOutlined />,
-              label: 'KPI Phân xưởng',
-            },
-            {
-              key: '/admin/workshop-kpi-view',
-              icon: <BarChartOutlined />,
-              label: 'Xem KPI theo phân xưởng',
-            },
-            {
-              key: '/admin/monthly-scores-view',
-              icon: <BarChartOutlined />,
-              label: 'Điểm KPI tháng',
-            },
-            {
-              key: '/admin/bonus-configs',
-              icon: <TrophyOutlined />,
-              label: 'Cấu hình thưởng',
-            },
-            {
-              key: '/admin/notifications',
-              icon: <CheckOutlined />,
-              label: 'Quản lý Thông báo',
-            },
-          ],
-        },     
-        {
-          key: 'evaluation',
-          icon: <CheckOutlined />,
-          label: 'Quản lý Đánh giá',
-          children: [
-            {
-              key: '/admin/penalty-rules',
-              icon: <FileTextOutlined />,
-              label: 'Quy tắc Trừ điểm KPI',
-            },
-          ],
-        },
-        {
-          key: 'hr-management',
-          icon: <TeamOutlined />,
-          label: 'Quản lý Nhân sự',
-          children: [
-            {
-              key: '/admin/branches',
-              icon: <TeamOutlined />,
-              label: 'Quản lý Phân xưởng',
-            },
-            {
-              key: '/admin/employee',
-              icon: <UserOutlined />,
-              label: 'Quản lý Nhân viên',
-            },
-          ],
-        },
-      );
-    }
-
-    if (user?.role === 'workshop_manager') {
-      baseItems.push(
-        {
-          key: '/branch/data-entry',
-          icon: <FileTextOutlined />,
-          label: 'Nhập dữ liệu KPI',
-        },
-        {
-          key: '/branch/kpi-view',
-          icon: <BarChartOutlined />,
-          label: 'Chi tiết KPI',
-        },
-        {
-          key: '/branch/monthly-scores',
-          icon: <BarChartOutlined />,
-          label: 'Điểm KPI tháng',
-        },
-      );
-    }
-
-    if (user?.role === 'employee') {
-      baseItems.push({
-        key: '/me/kpis',
-        icon: <BarChartOutlined />,
-        label: 'KPI của tôi',
-      });
-    }
-
-    // Thêm các menu items chung khác
-    baseItems.push(
-      {
-        key: '/reports',
-        icon: <BarChartOutlined />,
-        label: 'Báo cáo',
-        disabled: true,
-      },
-    );
-
-    return baseItems;
-  };
-
   // Gọi useMemo TRƯỚC khi có điều kiện early return
-  const menuItems = useMemo(() => getMenuItems(), [user?.role]);
+  const menuItems = useMemo(() => getMenuItemsByRole(user?.role), [user?.role]);
   
   // Xử lý breadcrumb cho dynamic routes
-  let currentBreadcrumb = breadcrumbMap[location.pathname] || 'Dashboard KPI';
+  let currentBreadcrumb = BREADCRUMB_MAP[location.pathname] || 'Dashboard KPI';
   if (location.pathname.startsWith('/admin/kpi-dashboards/')) {
     currentBreadcrumb = 'Dashboard Phòng ban KPI';
   }

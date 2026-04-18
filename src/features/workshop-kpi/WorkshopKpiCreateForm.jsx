@@ -1,29 +1,14 @@
 import { useState } from 'react';
 import { Input, Button, Checkbox, Select, Table, message } from 'antd';
 import { Plus, Trash2, Send } from 'lucide-react';
-
-const COLORS = {
-  success: '#16a34a',
-  warning: '#d97706',
-  primary: '#3b5fc4',
-  primaryBg: 'rgba(59,95,196,0.08)',
-  muted: '#6b7280',
-  foreground: '#1a1f2e',
-  card: '#ffffff',
-  border: '#e2e5ef',
-};
-
-const bscColorMap = {
-  'Tài chính': { color: '#1d4ed8', background: 'rgba(59,130,246,0.1)' },
-  'Khách hàng': { color: '#15803d', background: 'rgba(16,185,129,0.1)' },
-  'Quy trình nội bộ': { color: '#b45309', background: 'rgba(245,158,11,0.1)' },
-  'Học hỏi & Phát triển': { color: '#7c3aed', background: 'rgba(168,85,247,0.1)' },
-};
+import { BSC_COLORS } from '../../constants/bsc';
+import { KPI_COLORS } from '../../constants/uiTokens';
+import { getCurrentYear, getYearRange } from '../../constants/year';
 
 const WorkshopKpiCreateForm = ({ workshops, bscCategories, years, penaltyLogics, onCreateKpi }) => {
   const defaultBscId = bscCategories[0]?.id ?? '';
-  const currentYear = new Date().getFullYear();
-  const yearList = years?.length ? years : [currentYear, currentYear - 1, currentYear + 1];
+  const currentYear = getCurrentYear();
+  const yearList = years?.length ? years : getYearRange(currentYear);
 
   const [formYear, setFormYear] = useState(String(yearList[0]));
   const [selectedWorkshopIds, setSelectedWorkshopIds] = useState(workshops[0] ? [workshops[0].id] : []);
@@ -90,7 +75,7 @@ const WorkshopKpiCreateForm = ({ workshops, bscCategories, years, penaltyLogics,
   const bscOptions = bscCategories.map(c => ({
     value: c.id,
     label: (
-      <span style={{ display: 'inline-flex', padding: '2px 6px', borderRadius: 4, fontSize: 12, fontWeight: 500, ...(bscColorMap[c.name] || {}) }}>
+      <span style={{ display: 'inline-flex', padding: '2px 6px', borderRadius: 4, fontSize: 12, fontWeight: 500, ...(BSC_COLORS[c.name] || {}) }}>
         {c.name}
       </span>
     ),
@@ -147,7 +132,7 @@ const WorkshopKpiCreateForm = ({ workshops, bscCategories, years, penaltyLogics,
       title: '', key: 'action', width: 50, align: 'center',
       render: (_, row) => rows.length > 1 ? (
         <Button type="text" size="small" icon={<Trash2 size={14} />}
-          onClick={() => removeRow(row.tempId)} style={{ color: COLORS.danger }} />
+          onClick={() => removeRow(row.tempId)} style={{ color: KPI_COLORS.danger }} />
       ) : null,
     },
   ];
@@ -156,22 +141,22 @@ const WorkshopKpiCreateForm = ({ workshops, bscCategories, years, penaltyLogics,
     <div>
       <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 12, fontWeight: 500, color: COLORS.muted }}>Năm</label>
+          <label style={{ fontSize: 12, fontWeight: 500, color: KPI_COLORS.muted }}>Năm</label>
           <Select value={formYear} onChange={setFormYear} options={yearOptions} style={{ width: 110 }} size="small" />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <label style={{ fontSize: 12, fontWeight: 500, color: COLORS.muted }}>Phân xưởng</label>
+          <label style={{ fontSize: 12, fontWeight: 500, color: KPI_COLORS.muted }}>Phân xưởng</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
               <Checkbox id="sel-all" checked={selectAll} onChange={e => handleSelectAll(e.target.checked)} />
-              <label htmlFor="sel-all" style={{ fontSize: 12, color: COLORS.muted, cursor: 'pointer' }}>Tất cả</label>
+              <label htmlFor="sel-all" style={{ fontSize: 12, color: KPI_COLORS.muted, cursor: 'pointer' }}>Tất cả</label>
             </div>
             {workshops.map(ws => {
               const active = selectedWorkshopIds.includes(ws.id);
               return (
                 <div key={ws.id} onClick={() => toggleWorkshop(ws.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 6, border: `1px solid ${active ? COLORS.primary : COLORS.border}`, background: active ? COLORS.primaryBg : 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 500, color: active ? COLORS.foreground : COLORS.muted }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 6, border: `1px solid ${active ? KPI_COLORS.primary : KPI_COLORS.border}`, background: active ? KPI_COLORS.primaryBg : 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 500, color: active ? KPI_COLORS.foreground : KPI_COLORS.muted }}>
                   <Checkbox checked={active} style={{ pointerEvents: 'none' }} />
                   {ws.name}
                 </div>
@@ -181,20 +166,20 @@ const WorkshopKpiCreateForm = ({ workshops, bscCategories, years, penaltyLogics,
         </div>
       </div>
 
-      <div style={{ background: COLORS.card, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: `1px solid ${COLORS.border}`, overflow: 'hidden' }}>
+      <div style={{ background: KPI_COLORS.card, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: `1px solid ${KPI_COLORS.border}`, overflow: 'hidden' }}>
         <Table columns={columns} dataSource={rows} rowKey="tempId" pagination={false} size="small"
           footer={() => (
             <Button type="text" size="small" icon={<Plus size={14} />} onClick={addRow}
-              style={{ width: '100%', color: COLORS.muted, fontSize: 12 }}>
+              style={{ width: '100%', color: KPI_COLORS.muted, fontSize: 12 }}>
               Thêm dòng KPI
             </Button>
           )} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
-        <span style={{ fontSize: 14, fontWeight: 500, color: totalWeight === 100 ? COLORS.success : COLORS.warning }}>
+        <span style={{ fontSize: 14, fontWeight: 500, color: totalWeight === 100 ? KPI_COLORS.success : KPI_COLORS.warning }}>
           Tổng trọng số: {totalWeight}%
-          {totalWeight !== 100 && <span style={{ fontSize: 12, fontWeight: 400, color: COLORS.muted, marginLeft: 4 }}>(nên = 100%)</span>}
+          {totalWeight !== 100 && <span style={{ fontSize: 12, fontWeight: 400, color: KPI_COLORS.muted, marginLeft: 4 }}>(nên = 100%)</span>}
         </span>
         <Button type="primary" icon={<Send size={16} />} onClick={handleSubmitAll} disabled={filledCount === 0}>
           Tạo {filledCount > 0 ? `${filledCount} KPI` : 'KPI'}

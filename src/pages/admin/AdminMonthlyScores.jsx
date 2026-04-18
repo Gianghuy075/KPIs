@@ -1,61 +1,61 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, Select, Space, Spin, message } from 'antd';
-import workshopKpiService from '../../services/workshopKpiService';
-import penaltyService from '../../services/penaltyService';
-import bonusConfigService from '../../services/bonusConfigService';
 import MonthlyScoreView from '../../features/workshop-kpi/MonthlyScoreView';
+import { useWorkshopKpiMeta } from '../../hooks/useWorkshopKpiMeta';
+import { useWorkshopKpiDataset } from '../../hooks/useWorkshopKpiDataset';
+import { getCurrentYear, getYearRange, toYearOptions } from '../../constants/year';
 
-const currentYear = new Date().getFullYear();
-const years = [currentYear - 1, currentYear, currentYear + 1];
+const currentYear = getCurrentYear();
+const years = getYearRange(currentYear);
 
 const AdminMonthlyScores = () => {
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedWorkshopId, setSelectedWorkshopId] = useState(null);
 
-  const [workshops, setWorkshops] = useState([]);
-  const [bscCategories, setBscCategories] = useState([]);
-  const [penaltyLogics, setPenaltyLogics] = useState([]);
-  const [kpis, setKpis] = useState([]);
-  const [bonusConfig, setBonusConfig] = useState(null);
-
-  const [loadingMeta, setLoadingMeta] = useState(true);
-  const [loadingKpis, setLoadingKpis] = useState(false);
-
-  useEffect(() => {
-    Promise.all([
-      workshopKpiService.listWorkshops(),
-      workshopKpiService.listBscCategories(),
-      penaltyService.list(),
-    ]).then(([ws, bsc, pl]) => {
-      setWorkshops(ws);
-      setBscCategories(bsc);
-      setPenaltyLogics(pl);
-      if (ws.length) setSelectedWorkshopId(ws[0].id);
-    }).catch(() => message.error('Không thể tải dữ liệu'))
-      .finally(() => setLoadingMeta(false));
-  }, []);
+  const {
+    workshops,
+    bscCategories,
+    penaltyLogics,
+    loading: loadingMeta,
+    error: metaError,
+  } = useWorkshopKpiMeta({ includeWorkshops: true, includePenaltyLogics: true });
 
   useEffect(() => {
-    if (!selectedWorkshopId) return;
-    setLoadingKpis(true);
-    Promise.all([
-      workshopKpiService.list({ year: selectedYear, phanXuongId: selectedWorkshopId }),
-      bonusConfigService.list({ year: selectedYear, phanXuongId: selectedWorkshopId }),
-    ]).then(([kpiList, cfgList]) => {
-      setKpis(kpiList);
-      setBonusConfig(cfgList?.[0] ?? null);
-    }).catch(() => message.error('Không thể tải danh sách KPI'))
-      .finally(() => setLoadingKpis(false));
-  }, [selectedWorkshopId, selectedYear]);
+    if (workshops.length && !selectedWorkshopId) {
+      setSelectedWorkshopId(workshops[0].id);
+    }
+  }, [selectedWorkshopId, workshops]);
+
+  const {
+    kpis,
+    bonusConfig,
+    loading: loadingKpis,
+    error: datasetError,
+  } = useWorkshopKpiDataset({
+    year: selectedYear,
+    workshopId: selectedWorkshopId,
+    includeBonusConfig: true,
+    enabled: Boolean(selectedWorkshopId),
+  });
+
+  useEffect(() => {
+    if (metaError) message.error(metaError);
+  }, [metaError]);
+
+  useEffect(() => {
+    if (datasetError) message.error(datasetError);
+  }, [datasetError]);
 
   const bscCategoryMap = useMemo(() => {
     const map = {};
-    bscCategories.forEach(c => { map[c.id] = c.name; });
+    bscCategories.forEach((category) => {
+      map[category.id] = category.name;
+    });
     return map;
   }, [bscCategories]);
 
-  const yearOptions = years.map(y => ({ value: String(y), label: String(y) }));
-  const workshopOptions = workshops.map(w => ({ value: w.id, label: w.name }));
+  const yearOptions = toYearOptions(years);
+  const workshopOptions = workshops.map((workshop) => ({ value: workshop.id, label: workshop.name }));
 
   if (loadingMeta) return <div style={{ textAlign: 'center', padding: 64 }}><Spin size="large" /></div>;
 

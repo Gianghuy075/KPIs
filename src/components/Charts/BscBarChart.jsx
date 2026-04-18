@@ -2,19 +2,13 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, LabelList,
 } from 'recharts';
+import { DASHBOARD_BSC_SHORT_NAMES } from '../../constants/dashboard';
 
 const BSC_COLORS = {
   'Tài chính': '#1d4ed8',
   'Khách hàng': '#15803d',
   'Quy trình nội bộ': '#b45309',
   'Học hỏi & Phát triển': '#7c3aed',
-};
-
-const SHORT_NAMES = {
-  'Tài chính': 'Tài chính',
-  'Khách hàng': 'Khách hàng',
-  'Quy trình nội bộ': 'Quy trình',
-  'Học hỏi & Phát triển': 'Học hỏi',
 };
 
 const CustomTooltip = ({ active, payload }) => {
@@ -58,5 +52,5 @@ const BscBarChart = ({ data }) => (
   </ResponsiveContainer>
 );
 
-export { SHORT_NAMES };
+export const SHORT_NAMES = DASHBOARD_BSC_SHORT_NAMES;
 export default BscBarChart;

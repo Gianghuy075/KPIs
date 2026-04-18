@@ -1,67 +1,57 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Select, Card, Space, Spin, message } from 'antd';
-import workshopKpiService from '../../services/workshopKpiService';
-import penaltyService from '../../services/penaltyService';
 import EmployeeKpiView from './EmployeeKpiView';
+import { useWorkshopKpiDataset } from '../../hooks/useWorkshopKpiDataset';
+import { useWorkshopKpiMeta } from '../../hooks/useWorkshopKpiMeta';
+import { getCurrentYear, getYearRange } from '../../constants/year';
 
-const currentYear = new Date().getFullYear();
-const yearOptions = [currentYear - 1, currentYear, currentYear + 1].map(y => ({ value: y, label: String(y) }));
+const currentYear = getCurrentYear();
+const yearOptions = getYearRange(currentYear).map((year) => ({ value: year, label: String(year) }));
 
 const AdminKpiOverview = () => {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedWorkshopId, setSelectedWorkshopId] = useState(null);
 
-  const [workshops, setWorkshops] = useState([]);
-  const [bscCategories, setBscCategories] = useState([]);
-  const [penaltyLogics, setPenaltyLogics] = useState([]);
-  const [kpis, setKpis] = useState([]);
-  const [allEntries, setAllEntries] = useState({});
-  const [loadingMeta, setLoadingMeta] = useState(true);
-  const [loadingKpis, setLoadingKpis] = useState(false);
+  const {
+    workshops,
+    bscCategories,
+    penaltyLogics,
+    loading: loadingMeta,
+    error: metaError,
+  } = useWorkshopKpiMeta({ includeWorkshops: true, includePenaltyLogics: true });
 
   useEffect(() => {
-    Promise.all([
-      workshopKpiService.listWorkshops(),
-      workshopKpiService.listBscCategories(),
-      penaltyService.list(),
-    ]).then(([ws, bsc, pl]) => {
-      setWorkshops(ws);
-      setBscCategories(bsc);
-      setPenaltyLogics(pl);
-      if (ws.length) setSelectedWorkshopId(ws[0].id);
-    }).catch(() => message.error('Không thể tải dữ liệu'))
-      .finally(() => setLoadingMeta(false));
-  }, []);
+    if (workshops.length && !selectedWorkshopId) {
+      setSelectedWorkshopId(workshops[0].id);
+    }
+  }, [selectedWorkshopId, workshops]);
+
+  const {
+    kpis,
+    entriesByKpi,
+    loading: loadingKpis,
+    error: datasetError,
+  } = useWorkshopKpiDataset({
+    year: selectedYear,
+    workshopId: selectedWorkshopId,
+    includeMonthlyEntries: true,
+    normalizeMonthlyEntries: true,
+    enabled: Boolean(selectedWorkshopId),
+  });
 
   useEffect(() => {
-    if (!selectedWorkshopId) return;
-    setLoadingKpis(true);
-    workshopKpiService.list({ year: selectedYear, phanXuongId: selectedWorkshopId })
-      .then(async (kpiList) => {
-        setKpis(kpiList);
-        const entriesMap = {};
-        await Promise.all(kpiList.map(async (kpi) => {
-          try {
-            const entries = await workshopKpiService.getMonthlyEntries(kpi.id);
-            const map = {};
-            (entries || []).forEach(e => {
-              const idx = (e.month ?? e.monthIndex ?? 1) - 1;
-              map[idx] = e;
-            });
-            entriesMap[kpi.id] = map;
-          } catch {
-            entriesMap[kpi.id] = {};
-          }
-        }));
-        setAllEntries(entriesMap);
-      })
-      .catch(() => message.error('Không tải được KPI'))
-      .finally(() => setLoadingKpis(false));
-  }, [selectedWorkshopId, selectedYear]);
+    if (metaError) message.error(metaError);
+  }, [metaError]);
+
+  useEffect(() => {
+    if (datasetError) message.error(datasetError);
+  }, [datasetError]);
 
   const bscCategoryMap = useMemo(() => {
     const map = {};
-    bscCategories.forEach(c => { map[c.id] = c.name; });
+    bscCategories.forEach((category) => {
+      map[category.id] = category.name;
+    });
     return map;
   }, [bscCategories]);
 
@@ -77,7 +67,7 @@ const AdminKpiOverview = () => {
           <Select
             value={selectedWorkshopId}
             onChange={setSelectedWorkshopId}
-            options={workshops.map(w => ({ value: w.id, label: w.name }))}
+            options={workshops.map((workshop) => ({ value: workshop.id, label: workshop.name }))}
             style={{ width: 220 }}
             placeholder="Chọn phân xưởng"
           />
@@ -92,7 +82,7 @@ const AdminKpiOverview = () => {
           bscCategoryMap={bscCategoryMap}
           penaltyLogics={penaltyLogics}
           year={selectedYear}
-          allEntries={allEntries}
+          allEntries={entriesByKpi}
         />
       ) : (
         <Card>

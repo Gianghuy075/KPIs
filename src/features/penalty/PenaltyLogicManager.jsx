@@ -3,31 +3,8 @@ import { Table, Input, Button, Select, message, Spin } from 'antd';
 import { Plus, Pencil, Check, X, Trash2 } from 'lucide-react';
 import penaltyService from '../../services/penaltyService';
 import { calculatePenalty } from '../../utils/penaltyUtils';
-
-const COLORS = {
-  success: '#16a34a',
-  danger: '#dc2626',
-  primary: '#3b5fc4',
-  primaryBg: 'rgba(59,95,196,0.08)',
-  muted: '#6b7280',
-  foreground: '#1a1f2e',
-  card: '#ffffff',
-  border: '#e2e5ef',
-};
-
-const penaltyTypeLabels = {
-  fixed: 'Trừ điểm cố định',
-  percentage: 'Trừ theo %',
-  tiered: 'Trừ theo bậc',
-  cap: 'Trừ có giới hạn',
-};
-
-const penaltyTypeStyles = {
-  fixed: { background: 'rgba(59,130,246,0.1)', color: '#1d4ed8' },
-  percentage: { background: 'rgba(16,185,129,0.1)', color: '#15803d' },
-  tiered: { background: 'rgba(245,158,11,0.1)', color: '#b45309' },
-  cap: { background: 'rgba(168,85,247,0.1)', color: '#7c3aed' },
-};
+import { PENALTY_TYPE_LABELS, PENALTY_TYPE_STYLES } from '../../constants/penalty';
+import { KPI_COLORS } from '../../constants/uiTokens';
 
 const renderParamInfo = (logic) => {
   switch (logic.type) {
@@ -45,7 +22,7 @@ const renderEditParams = (values, onChange) => {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       {(type === 'fixed' || type === 'cap') && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 12, color: COLORS.muted }}>Điểm/lỗi:</span>
+          <span style={{ fontSize: 12, color: KPI_COLORS.muted }}>Điểm/lỗi:</span>
           <Input type="number" min={0} value={values.fixedPoints ?? 1}
             onChange={(e) => onChange({ ...values, fixedPoints: Number(e.target.value) })}
             style={{ height: 28, width: 64, fontSize: 12 }} />
@@ -53,7 +30,7 @@ const renderEditParams = (values, onChange) => {
       )}
       {type === 'percentage' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 12, color: COLORS.muted }}>%/lỗi:</span>
+          <span style={{ fontSize: 12, color: KPI_COLORS.muted }}>%/lỗi:</span>
           <Input type="number" min={0} max={100} value={values.percentPerError ?? 1}
             onChange={(e) => onChange({ ...values, percentPerError: Number(e.target.value) })}
             style={{ height: 28, width: 64, fontSize: 12 }} />
@@ -61,7 +38,7 @@ const renderEditParams = (values, onChange) => {
       )}
       {type === 'cap' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 12, color: COLORS.muted }}>Max:</span>
+          <span style={{ fontSize: 12, color: KPI_COLORS.muted }}>Max:</span>
           <Input type="number" min={0} value={values.maxDeduction ?? 20}
             onChange={(e) => onChange({ ...values, maxDeduction: Number(e.target.value) })}
             style={{ height: 28, width: 64, fontSize: 12 }} />
@@ -78,8 +55,8 @@ const renderPreview = (logic) => {
       {testErrors.map((e) => {
         const penalty = calculatePenalty(logic, e, 100);
         return (
-          <span key={e} style={{ color: COLORS.muted }}>
-            {e} lỗi → <span style={{ fontWeight: 600, color: COLORS.danger }}>-{penalty}đ</span>
+          <span key={e} style={{ color: KPI_COLORS.muted }}>
+            {e} lỗi → <span style={{ fontWeight: 600, color: KPI_COLORS.danger }}>-{penalty}đ</span>
           </span>
         );
       })}
@@ -147,7 +124,7 @@ const PenaltyLogicManager = () => {
     }
   };
 
-  const typeOptions = Object.entries(penaltyTypeLabels).map(([k, v]) => ({ value: k, label: v }));
+  const typeOptions = Object.entries(PENALTY_TYPE_LABELS).map(([k, v]) => ({ value: k, label: v }));
 
   const columns = [
     {
@@ -157,7 +134,7 @@ const PenaltyLogicManager = () => {
           onChange={(e) => setEditValues(v => ({ ...v, name: e.target.value }))}
           style={{ height: 32, fontSize: 14 }} />
       ) : (
-        <span style={{ fontWeight: 500, color: COLORS.foreground }}>{record.name}</span>
+        <span style={{ fontWeight: 500, color: KPI_COLORS.foreground }}>{record.name}</span>
       ),
     },
     {
@@ -166,8 +143,8 @@ const PenaltyLogicManager = () => {
         <Select value={editValues.type} onChange={(v) => setEditValues(ev => ({ ...ev, type: v }))}
           options={typeOptions} style={{ width: '100%' }} size="small" />
       ) : (
-        <span style={{ ...penaltyTypeStyles[record.type], display: 'inline-flex', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 500 }}>
-          {penaltyTypeLabels[record.type]}
+        <span style={{ ...PENALTY_TYPE_STYLES[record.type], display: 'inline-flex', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 500 }}>
+          {PENALTY_TYPE_LABELS[record.type]}
         </span>
       ),
     },
@@ -175,7 +152,7 @@ const PenaltyLogicManager = () => {
       title: 'Thông số', key: 'params', width: '15%',
       render: (_, record) => editingId === record.id
         ? renderEditParams(editValues, setEditValues)
-        : <span style={{ fontSize: 14, color: COLORS.muted }}>{renderParamInfo(record)}</span>,
+        : <span style={{ fontSize: 14, color: KPI_COLORS.muted }}>{renderParamInfo(record)}</span>,
     },
     {
       title: 'Mô tả', key: 'description', width: '25%',
@@ -184,7 +161,7 @@ const PenaltyLogicManager = () => {
           onChange={(e) => setEditValues(v => ({ ...v, description: e.target.value }))}
           style={{ height: 32, fontSize: 14 }} />
       ) : (
-        <span style={{ fontSize: 14, color: COLORS.muted }}>{record.description}</span>
+        <span style={{ fontSize: 14, color: KPI_COLORS.muted }}>{record.description}</span>
       ),
     },
     {
@@ -196,16 +173,16 @@ const PenaltyLogicManager = () => {
       render: (_, record) => editingId === record.id ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           <Button type="text" size="small" loading={saving}
-            icon={<Check style={{ color: COLORS.success }} size={16} />} onClick={saveEdit} />
+            icon={<Check style={{ color: KPI_COLORS.success }} size={16} />} onClick={saveEdit} />
           <Button type="text" size="small"
-            icon={<X style={{ color: COLORS.danger }} size={16} />} onClick={cancelEdit} />
+            icon={<X style={{ color: KPI_COLORS.danger }} size={16} />} onClick={cancelEdit} />
         </div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           <Button type="text" size="small"
-            icon={<Pencil style={{ color: COLORS.muted }} size={16} />} onClick={() => startEdit(record)} />
+            icon={<Pencil style={{ color: KPI_COLORS.muted }} size={16} />} onClick={() => startEdit(record)} />
           <Button type="text" size="small"
-            icon={<Trash2 style={{ color: COLORS.danger }} size={16} />} onClick={() => handleDelete(record.id)} />
+            icon={<Trash2 style={{ color: KPI_COLORS.danger }} size={16} />} onClick={() => handleDelete(record.id)} />
         </div>
       ),
     },
@@ -242,9 +219,9 @@ const PenaltyLogicManager = () => {
       render: () => (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           <Button type="text" size="small" loading={saving}
-            icon={<Check style={{ color: COLORS.success }} size={16} />} onClick={handleAdd} />
+            icon={<Check style={{ color: KPI_COLORS.success }} size={16} />} onClick={handleAdd} />
           <Button type="text" size="small"
-            icon={<X style={{ color: COLORS.danger }} size={16} />} onClick={() => setIsAdding(false)} />
+            icon={<X style={{ color: KPI_COLORS.danger }} size={16} />} onClick={() => setIsAdding(false)} />
         </div>
       ),
     },
@@ -256,8 +233,8 @@ const PenaltyLogicManager = () => {
     <div>
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h3 style={{ fontSize: 18, fontWeight: 600, color: COLORS.foreground, margin: 0 }}>Logic trừ điểm / Tính lỗi</h3>
-          <p style={{ fontSize: 14, color: COLORS.muted, margin: '4px 0 0' }}>Quản lý các quy tắc trừ điểm KPI khi có lỗi. Gán logic cho từng KPI khi tạo mới.</p>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: KPI_COLORS.foreground, margin: 0 }}>Logic trừ điểm / Tính lỗi</h3>
+          <p style={{ fontSize: 14, color: KPI_COLORS.muted, margin: '4px 0 0' }}>Quản lý các quy tắc trừ điểm KPI khi có lỗi. Gán logic cho từng KPI khi tạo mới.</p>
         </div>
         <Button type="primary" size="small" icon={<Plus size={16} />}
           onClick={() => setIsAdding(true)} disabled={isAdding}>
@@ -265,12 +242,12 @@ const PenaltyLogicManager = () => {
         </Button>
       </div>
 
-      <div style={{ background: COLORS.card, borderRadius: 8, border: `1px solid ${COLORS.border}`, overflow: 'hidden' }}>
+      <div style={{ background: KPI_COLORS.card, borderRadius: 8, border: `1px solid ${KPI_COLORS.border}`, overflow: 'hidden' }}>
         <Table columns={columns} dataSource={logics} rowKey="id" pagination={false} size="small" />
         {isAdding && (
           <Table columns={addingColumns} dataSource={[{ id: '__adding__' }]} rowKey="id"
             pagination={false} showHeader={false} size="small"
-            style={{ background: COLORS.primaryBg }} />
+            style={{ background: KPI_COLORS.primaryBg }} />
         )}
       </div>
     </div>

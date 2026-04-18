@@ -5,28 +5,19 @@ import {
   CheckOutlined,
 } from '@ant-design/icons';
 import { useNotification } from '../../contexts/NotificationContext';
+import {
+  getRecipientColor,
+  getRecipientLabel,
+} from '../../features/notification/notification-management/helpers';
 
 const NotificationDialog = ({ visible, onClose }) => {
   const { dialogNotifications, markAsRead, hideDialogNotification } = useNotification();
 
-  const getRecipientLabel = (recipients) => {
-    if (recipients.includes('branch_manager') && recipients.includes('employee')) {
-      return 'Cho tất cả';
-    }
-    if (recipients.includes('branch_manager')) {
-      return 'Cho Quản lý phân xưởng';
-    }
+  const getDialogRecipientLabel = (recipients) => {
+    const label = getRecipientLabel(recipients);
+    if (label === 'Quản lý + Nhân viên') return 'Cho tất cả';
+    if (label === 'Quản lý Phân xưởng') return 'Cho Quản lý phân xưởng';
     return 'Cho Nhân viên';
-  };
-
-  const getRecipientColor = (recipients) => {
-    if (recipients.includes('branch_manager') && recipients.includes('employee')) {
-      return 'blue';
-    }
-    if (recipients.includes('branch_manager')) {
-      return 'green';
-    }
-    return 'orange';
   };
 
   const handleMarkAsRead = (notificationId) => {
@@ -64,6 +55,7 @@ const NotificationDialog = ({ visible, onClose }) => {
               }}
               actions={[
                 <Button
+                  key="read"
                   type="primary"
                   size="small"
                   icon={<CheckOutlined />}
@@ -72,6 +64,7 @@ const NotificationDialog = ({ visible, onClose }) => {
                   Đã xem
                 </Button>,
                 <Button
+                  key="hide"
                   danger
                   size="small"
                   icon={<CloseOutlined />}
@@ -86,7 +79,7 @@ const NotificationDialog = ({ visible, onClose }) => {
                   <Space>
                     <strong>{notification.title}</strong>
                     <Tag color={getRecipientColor(notification.recipients)}>
-                      {getRecipientLabel(notification.recipients)}
+                      {getDialogRecipientLabel(notification.recipients)}
                     </Tag>
                   </Space>
                 }

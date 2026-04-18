@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Select, Button, Space, Modal, Spin, message, Card,
   Form, Input, InputNumber, App as AntApp,
@@ -8,24 +8,17 @@ import WorkshopKpiCreateForm from '../../features/workshop-kpi/WorkshopKpiCreate
 import PeriodTargetEditor from '../../features/workshop-kpi/PeriodTargetEditor';
 import KpiSystemTable from '../../components/KpiSystemTable';
 import workshopKpiService from '../../services/workshopKpiService';
-import penaltyService from '../../services/penaltyService';
+import { getCurrentYear, getYearRange, toYearOptions } from '../../constants/year';
+import { useWorkshopKpiMeta } from '../../hooks/useWorkshopKpiMeta';
+import { useWorkshopKpiDataset } from '../../hooks/useWorkshopKpiDataset';
 
-const currentYear = new Date().getFullYear();
-const years = [currentYear, currentYear - 1, currentYear + 1];
+const currentYear = getCurrentYear();
+const years = getYearRange(currentYear);
 
 const WorkshopKpis = () => {
   const { modal } = AntApp.useApp();
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [selectedWorkshopId, setSelectedWorkshopId] = useState(null);
-
-  const [kpis, setKpis] = useState([]);
-  const [workshops, setWorkshops] = useState([]);
-  const [bscCategories, setBscCategories] = useState([]);
-  const [penaltyLogics, setPenaltyLogics] = useState([]);
-  const [allEntries, setAllEntries] = useState({});
-
-  const [loadingMeta, setLoadingMeta] = useState(true);
-  const [loadingKpis, setLoadingKpis] = useState(false);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [periodModalOpen, setPeriodModalOpen] = useState(false);
@@ -34,44 +27,46 @@ const WorkshopKpis = () => {
   const [saving, setSaving] = useState(false);
   const [editForm] = Form.useForm();
 
-  useEffect(() => {
-    Promise.all([
-      workshopKpiService.listWorkshops(),
-      workshopKpiService.listBscCategories(),
-      penaltyService.list(),
-    ]).then(([ws, bsc, pl]) => {
-      setWorkshops(ws);
-      setBscCategories(bsc);
-      setPenaltyLogics(pl);
-      if (ws.length) setSelectedWorkshopId(ws[0].id);
-    }).catch(() => message.error('Không thể tải dữ liệu khởi tạo'))
-      .finally(() => setLoadingMeta(false));
-  }, []);
+  const {
+    workshops,
+    bscCategories,
+    penaltyLogics,
+    loading: loadingMeta,
+    error: metaError,
+  } = useWorkshopKpiMeta({ includeWorkshops: true, includePenaltyLogics: true });
 
   useEffect(() => {
-    if (!selectedWorkshopId || !selectedYear) return;
-    setLoadingKpis(true);
-    workshopKpiService.list({ year: selectedYear, phanXuongId: selectedWorkshopId })
-      .then(async (kpiList) => {
-        setKpis(kpiList);
-        const entriesMap = {};
-        await Promise.all(kpiList.map(async (kpi) => {
-          try {
-            const entries = await workshopKpiService.getMonthlyEntries(kpi.id);
-            entriesMap[kpi.id] = entries;
-          } catch {
-            entriesMap[kpi.id] = [];
-          }
-        }));
-        setAllEntries(entriesMap);
-      })
-      .catch(() => message.error('Không thể tải danh sách KPI'))
-      .finally(() => setLoadingKpis(false));
-  }, [selectedWorkshopId, selectedYear]);
+    if (workshops.length && !selectedWorkshopId) {
+      setSelectedWorkshopId(workshops[0].id);
+    }
+  }, [selectedWorkshopId, workshops]);
+
+  const {
+    kpis,
+    entriesByKpi,
+    loading: loadingKpis,
+    error: datasetError,
+    reload,
+  } = useWorkshopKpiDataset({
+    year: selectedYear,
+    workshopId: selectedWorkshopId,
+    includeMonthlyEntries: true,
+    enabled: Boolean(selectedWorkshopId),
+  });
+
+  useEffect(() => {
+    if (metaError) message.error(metaError);
+  }, [metaError]);
+
+  useEffect(() => {
+    if (datasetError) message.error(datasetError);
+  }, [datasetError]);
 
   const bscCategoryMap = useMemo(() => {
     const map = {};
-    bscCategories.forEach(c => { map[c.id] = c.name; });
+    bscCategories.forEach((category) => {
+      map[category.id] = category.name;
+    });
     return map;
   }, [bscCategories]);
 
@@ -90,11 +85,11 @@ const WorkshopKpis = () => {
     try {
       const values = await editForm.validateFields();
       setSaving(true);
-      const updated = await workshopKpiService.update(editingKpi.id, values);
-      setKpis(prev => prev.map(k => k.id === updated.id ? { ...k, ...updated } : k));
+      await workshopKpiService.update(editingKpi.id, values);
       message.success('Đã cập nhật KPI');
       setEditOpen(false);
       setEditingKpi(null);
+      reload();
     } catch (err) {
       if (!err?.errorFields) message.error('Cập nhật thất bại');
     } finally {
@@ -111,28 +106,29 @@ const WorkshopKpis = () => {
       cancelText: 'Hủy',
       onOk: async () => {
         await workshopKpiService.remove(row.id);
-        setKpis(prev => prev.filter(k => k.id !== row.id));
         message.success('Đã xóa KPI');
+        reload();
       },
     });
   };
 
   const handleCreateKpi = async (payload, workshopIds, year) => {
     try {
-      await Promise.all(workshopIds.map(phanXuongId =>
-        workshopKpiService.create({ ...payload, phanXuongId, year: Number(year) })
-      ));
+      await Promise.all(
+        workshopIds.map((phanXuongId) =>
+          workshopKpiService.create({ ...payload, phanXuongId, year: Number(year) }),
+        ),
+      );
       if (workshopIds.includes(selectedWorkshopId)) {
-        const updated = await workshopKpiService.list({ year: selectedYear, phanXuongId: selectedWorkshopId });
-        setKpis(updated);
+        reload();
       }
     } catch {
       message.error('Tạo KPI thất bại');
     }
   };
 
-  const yearOptions = years.map(y => ({ value: String(y), label: String(y) }));
-  const workshopOptions = workshops.map(w => ({ value: w.id, label: w.name }));
+  const yearOptions = toYearOptions(years);
+  const workshopOptions = workshops.map((workshop) => ({ value: workshop.id, label: workshop.name }));
 
   if (loadingMeta) return <div style={{ textAlign: 'center', padding: 64 }}><Spin size="large" /></div>;
 
@@ -144,7 +140,13 @@ const WorkshopKpis = () => {
             <span style={{ fontWeight: 500 }}>Năm:</span>
             <Select value={selectedYear} onChange={setSelectedYear} options={yearOptions} style={{ width: 100 }} />
             <span style={{ fontWeight: 500 }}>Phân xưởng:</span>
-            <Select value={selectedWorkshopId} onChange={setSelectedWorkshopId} options={workshopOptions} style={{ width: 200 }} placeholder="Chọn phân xưởng" />
+            <Select
+              value={selectedWorkshopId}
+              onChange={setSelectedWorkshopId}
+              options={workshopOptions}
+              style={{ width: 200 }}
+              placeholder="Chọn phân xưởng"
+            />
           </Space>
           <Space>
             <Button icon={<BarChartOutlined />} onClick={() => setPeriodModalOpen(true)} disabled={!kpis.length}>
@@ -159,7 +161,7 @@ const WorkshopKpis = () => {
 
       <KpiSystemTable
         kpis={kpis}
-        allEntries={allEntries}
+        allEntries={entriesByKpi}
         bscCategoryMap={bscCategoryMap}
         penaltyLogics={penaltyLogics}
         canManage
@@ -168,7 +170,6 @@ const WorkshopKpis = () => {
         loading={loadingKpis}
       />
 
-      {/* Edit KPI Modal */}
       <Modal
         title="Chỉnh sửa KPI"
         open={editOpen}

@@ -19,7 +19,7 @@ const KPITable = ({
   onEdit,
   onDelete,
   showActions = true,
-  categoryWeights = {},
+  categoryWeights: _categoryWeights = {},
 }) => {
   const tableData = useMemo(() => {
     if (!kpis || kpis.length === 0) return [];
